@@ -1,0 +1,36 @@
+/* Fuentes de Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
+
+/* Directivas de Tailwind CSS v3 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Variables CSS personalizadas para SIRDS */
+:root {
+  --color-primary: #f1e043;
+  --color-primary-dark: #ffec40;
+  --color-secondary: #64748b;
+}
+
+/* Estilos base personalizados */
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Componentes personalizados para SIRDS */
+@layer components {
+  .btn-primary {
+    @apply bg-primary-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-600 transition-all duration-200 border-none cursor-pointer;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden;
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  }
+}
