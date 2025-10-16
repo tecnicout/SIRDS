@@ -146,10 +146,11 @@ const requireAdminOrHR = requireRole(['administrador', 'recursos_humanos']);
  */
 const requireAdminOrWarehouse = requireRole(['administrador', 'almacen']);
 
-module.exports = authMiddleware; // Export por defecto para compatibilidad
-module.exports.authMiddleware = authMiddleware;
-module.exports.requireRole = requireRole;
-module.exports.requirePermission = requirePermission;
-module.exports.requireAdmin = requireAdmin;
-module.exports.requireAdminOrHR = requireAdminOrHR;
-module.exports.requireAdminOrWarehouse = requireAdminOrWarehouse;
+module.exports = {
+    authMiddleware,
+    requireRole,
+    requirePermission,
+    requireAdmin,
+    requireAdminOrHR,
+    requireAdminOrWarehouse
+};

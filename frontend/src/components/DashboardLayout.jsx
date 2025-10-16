@@ -8,7 +8,9 @@ export default function DashboardLayout({ children, onLogout }) {
       <Sidebar />
       <div className="flex-1 min-h-screen flex flex-col">
         <NavPrivada onLogout={onLogout} />
-        <main className="p-6">{children}</main>
+        <main className="p-6 flex-1">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const UbicacionController = require('../controllers/UbicacionController');
+const authMiddleware = require('../middleware/authMiddleware');
+
+// Aplicar middleware de autenticación a todas las rutas
+router.use(authMiddleware);
 
 // Rutas para ubicaciones
 router.get('/', UbicacionController.getAll);

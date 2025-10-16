@@ -68,6 +68,15 @@ class UbicacionController {
                 });
             }
 
+            // Verificar si ya existe una ubicación con el mismo nombre
+            const existeNombre = await UbicacionModel.existsByName(nombre);
+            if (existeNombre) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ya existe una ubicación con ese nombre'
+                });
+            }
+
             const insertId = await UbicacionModel.create({ nombre, tipo, direccion });
             
             res.status(201).json({
@@ -106,6 +115,15 @@ class UbicacionController {
                 });
             }
 
+            // Verificar si ya existe una ubicación con el mismo nombre (excluyendo la actual)
+            const existeNombre = await UbicacionModel.existsByName(nombre, id);
+            if (existeNombre) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ya existe una ubicación con ese nombre'
+                });
+            }
+
             const updated = await UbicacionModel.update(id, { nombre, tipo, direccion });
             
             if (!updated) {
@@ -133,29 +151,45 @@ class UbicacionController {
     static async delete(req, res) {
         try {
             const { id } = req.params;
-            const deleted = await UbicacionModel.delete(id);
-            
-            if (!deleted) {
+
+            // Verificar si la ubicación existe
+            const ubicacion = await UbicacionModel.getById(id);
+            if (!ubicacion) {
                 return res.status(404).json({
                     success: false,
                     message: 'Ubicación no encontrada'
                 });
             }
 
+            // Verificar cuántas áreas están relacionadas
+            const areasRelacionadas = await UbicacionModel.getRelatedAreas(id);
+
+            // Eliminar ubicación reasignando áreas automáticamente
+            const resultado = await UbicacionModel.deleteWithAreasHandling(id);
+            
+            if (!resultado.success) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'No se pudo eliminar la ubicación'
+                });
+            }
+
+            // Mensaje específico según si había áreas relacionadas
+            let message = 'Ubicación eliminada correctamente';
+            if (areasRelacionadas > 0) {
+                message = `Ubicación eliminada correctamente. Las ${areasRelacionadas} área(s) relacionada(s) se reasignaron temporalmente.`;
+            }
+
             res.json({
                 success: true,
-                message: 'Ubicación eliminada correctamente'
+                message: message,
+                data: {
+                    areasReasignadas: resultado.areasReassigned || 0,
+                    ubicacionTemporal: resultado.temporalLocationId
+                }
             });
         } catch (error) {
             console.error('Error al eliminar ubicación:', error);
-            
-            // Error de clave foránea
-            if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'No se puede eliminar la ubicación porque tiene áreas asociadas'
-                });
-            }
 
             res.status(500).json({
                 success: false,

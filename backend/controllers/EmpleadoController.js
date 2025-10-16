@@ -102,16 +102,31 @@ class EmpleadoController {
     static async update(req, res) {
         try {
             const { id } = req.params;
+            
+            // Limpieza de campos undefined antes de procesar
+            Object.keys(req.body).forEach(key => {
+                if (req.body[key] === undefined) {
+                    req.body[key] = null;
+                }
+            });
+            
             const {
                 nombre, apellido, email, telefono, cargo,
                 id_genero, id_area, id_rol, estado
             } = req.body;
 
-            // Validaciones básicas
-            if (!nombre || !apellido || !id_genero || !id_area || !id_rol) {
+            // Validaciones básicas para campos obligatorios
+            const camposFaltantes = [];
+            if (!nombre || nombre.trim() === '') camposFaltantes.push('nombre');
+            if (!apellido || apellido.trim() === '') camposFaltantes.push('apellido');
+            if (!id_genero) camposFaltantes.push('género');
+            if (!id_area) camposFaltantes.push('área');
+            if (!id_rol) camposFaltantes.push('rol');
+            
+            if (camposFaltantes.length > 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Nombre, apellido, género, área y rol son requeridos'
+                    message: `Campos requeridos faltantes: ${camposFaltantes.join(', ')}`
                 });
             }
 

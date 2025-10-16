@@ -8,19 +8,26 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["dotacion", "gestion", "inventario", "empleados"],
+  "keywords": [
+    "dotacion",
+    "gestion",
+    "inventario",
+    "empleados"
+  ],
   "author": "SIRDS Team",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "mysql2": "^3.6.3",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
+    "express": "^4.18.2",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
-    "morgan": "^1.10.0"
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.6.3",
+    "node-fetch": "^2.7.0",
+    "nodemailer": "^7.0.9"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

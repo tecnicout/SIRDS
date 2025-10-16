@@ -9,4 +9,16 @@ router.post('/login', AuthController.login);
 // Información del usuario autenticado
 router.get('/me', authMiddleware, AuthController.me);
 
+// Cambiar contraseña propia
+router.post('/change-password', authMiddleware, AuthController.changePassword);
+
+// Logout
+router.post('/logout', authMiddleware, AuthController.logout);
+
+// Verificar permisos específicos
+router.get('/check-permission', authMiddleware, AuthController.checkPermission);
+
+// Estadísticas de autenticación (Solo Admin)
+router.get('/stats', authMiddleware, AuthController.getAuthStats);
+
 module.exports = router;

@@ -65,9 +65,29 @@ class EmpleadoModel {
     // Actualizar empleado
     static async update(id, empleadoData) {
         const {
-            nombre, apellido, email, telefono, cargo,
-            id_genero, id_area, id_rol, estado
+            nombre,
+            apellido,
+            email,
+            telefono,
+            cargo,
+            id_genero,
+            id_area,
+            id_rol,
+            estado
         } = empleadoData;
+
+        // Convertir undefined a null para compatibilidad con MySQL2
+        const safeData = {
+            nombre: nombre ?? null,
+            apellido: apellido ?? null,
+            email: email ?? null,
+            telefono: telefono ?? null,
+            cargo: cargo ?? null,
+            id_genero: id_genero ?? null,
+            id_area: id_area ?? null,
+            id_rol: id_rol ?? null,
+            estado: estado ?? 1
+        };
         
         const sql = `
             UPDATE Empleado 
@@ -77,8 +97,16 @@ class EmpleadoModel {
         `;
         
         const result = await query(sql, [
-            nombre, apellido, email, telefono, cargo,
-            id_genero, id_area, id_rol, estado, id
+            safeData.nombre,
+            safeData.apellido,
+            safeData.email,
+            safeData.telefono,
+            safeData.cargo,
+            safeData.id_genero,
+            safeData.id_area,
+            safeData.id_rol,
+            safeData.estado,
+            id
         ]);
         
         return result.affectedRows > 0;
@@ -125,6 +153,27 @@ class EmpleadoModel {
         `;
         const searchPattern = `%${searchTerm}%`;
         return await query(sql, [searchPattern, searchPattern, searchPattern]);
+    }
+
+    // Buscar empleado por email (para autenticación)
+    static async findByEmail(email) {
+        const sql = `
+            SELECT 
+                e.*,
+                g.nombre as genero_nombre,
+                a.nombre_area,
+                r.nombre_rol,
+                u.nombre as ubicacion_nombre,
+                u.id_ubicacion
+            FROM Empleado e
+            LEFT JOIN Genero g ON e.id_genero = g.id_genero
+            LEFT JOIN Area a ON e.id_area = a.id_area
+            LEFT JOIN Rol r ON e.id_rol = r.id_rol
+            LEFT JOIN Ubicacion u ON a.id_ubicacion = u.id_ubicacion
+            WHERE e.email = ? AND e.estado = 1
+        `;
+        const result = await query(sql, [email]);
+        return result[0];
     }
 }
 

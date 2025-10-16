@@ -16,7 +16,7 @@ async function initializeDatabase() {
     
     try {
         // Leer el archivo SQL
-        const sqlFilePath = path.join(__dirname, 'database_init.sql');
+        const sqlFilePath = path.join(__dirname, '../init/database_init.sql');
         const sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
         
         // Dividir el contenido en statements individuales
@@ -33,9 +33,6 @@ async function initializeDatabase() {
             if (statement.length > 0) {
                 try {
                     await connection.execute(statement);
-                    if (i % 10 === 0) {
-                        console.log(`⏳ Progreso: ${i + 1}/${statements.length} comandos ejecutados`);
-                    }
                 } catch (error) {
                     console.log(`⚠️  Warning en statement ${i + 1}: ${error.message}`);
                 }

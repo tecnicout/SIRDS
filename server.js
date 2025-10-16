@@ -25,21 +25,9 @@ app.use(express.urlencoded({ extended: true }));
 // Servir archivos estáticos del frontend
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-// Ruta específica para la página principal (landing)
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'landing.html'));
-});
-
-// Ruta específica para el dashboard
-app.get('/dashboard.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
-});
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
-});
-
 // Importar rutas
+const authRoutes = require('./backend/routes/authRoutes');
+const usuarioRoutes = require('./backend/routes/usuarioRoutes');
 const ubicacionRoutes = require('./backend/routes/ubicacionRoutes');
 const areaRoutes = require('./backend/routes/areaRoutes');
 const generoRoutes = require('./backend/routes/generoRoutes');
@@ -56,6 +44,8 @@ const pedidoRoutes = require('./backend/routes/pedidoRoutes');
 const entregaRoutes = require('./backend/routes/entregaRoutes');
 
 // Rutas API
+app.use('/api/auth', authRoutes);
+app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/ubicaciones', ubicacionRoutes);
 app.use('/api/areas', areaRoutes);
 app.use('/api/generos', generoRoutes);
@@ -70,11 +60,6 @@ app.use('/api/kits', kitRoutes);
 app.use('/api/solicitudes', solicitudRoutes);
 app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/entregas', entregaRoutes);
-
-// Ruta principal - servir la página principal
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
-});
 
 // Manejo de errores global
 app.use((err, req, res, next) => {
@@ -97,8 +82,8 @@ app.use('*', (req, res) => {
         // Servir el dashboard original
         res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
     } else {
-        // Servir la página landing como página principal
-        res.sendFile(path.join(__dirname, 'frontend', 'landing.html'));
+        // Servir la página principal
+        res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
     }
 });
 
