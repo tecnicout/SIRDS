@@ -29,10 +29,10 @@ export default function Dashboard() {
         </p>
         {user && (
           <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-            {user.cargo && <span>🏢 {user.cargo}</span>}
-            {user.area && <span>📍 {user.area}</span>}
-            {user.rol_sistema && <span>👤 {user.rol_sistema.replace('_', ' ').toUpperCase()}</span>}
-            {user.ubicacion && <span>🌎 {user.ubicacion}</span>}
+            {user.cargo && <span><i className="bx bx-buildings text-lg mr-1"></i> {user.cargo}</span>}
+            {user.area && <span><i className="bx bx-map-pin text-lg mr-1"></i> {user.area}</span>}
+            {user.nombre_rol && <span><i className="bx bx-user text-lg mr-1"></i> {user.nombre_rol.toUpperCase()}</span>}
+            {user.ubicacion && <span><i className="bx bx-world text-lg mr-1"></i> {user.ubicacion}</span>}
           </div>
         )}
       </div>
@@ -41,8 +41,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-2xl">
-              👥
+            <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+              <i className="bx bx-group text-3xl text-white"></i>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Empleados</p>
@@ -53,8 +53,8 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-2xl">
-              📦
+            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
+              <i className="bx bx-package text-3xl text-white"></i>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Dotaciones</p>
@@ -65,8 +65,8 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center text-2xl">
-              📋
+            <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
+              <i className="bx bx-clipboard text-3xl text-white"></i>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Solicitudes</p>
@@ -77,8 +77,8 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center text-2xl">
-              ⚡
+            <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+              <i className="bx bx-zap text-3xl text-white"></i>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Entregas</p>

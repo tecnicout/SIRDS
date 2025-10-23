@@ -8,13 +8,11 @@ class EmpleadoModel {
                 e.*,
                 g.nombre as genero_nombre,
                 a.nombre_area,
-                r.nombre_rol,
                 u.nombre as ubicacion_nombre
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
-            LEFT JOIN Ubicacion u ON a.id_ubicacion = u.id_ubicacion
+            LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
             ORDER BY e.apellido, e.nombre
         `;
         return await query(sql);
@@ -27,14 +25,12 @@ class EmpleadoModel {
                 e.*,
                 g.nombre as genero_nombre,
                 a.nombre_area,
-                r.nombre_rol,
                 u.nombre as ubicacion_nombre,
                 u.id_ubicacion
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
-            LEFT JOIN Ubicacion u ON a.id_ubicacion = u.id_ubicacion
+            LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
             WHERE e.id_empleado = ?
         `;
         const result = await query(sql, [id]);
@@ -44,20 +40,24 @@ class EmpleadoModel {
     // Crear nuevo empleado
     static async create(empleadoData) {
         const {
-            nombre, apellido, email, telefono, cargo,
-            id_genero, id_area, id_rol, estado = 1
+            Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
+            email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
+            fecha_fin, estado = 1
         } = empleadoData;
         
         const sql = `
             INSERT INTO Empleado 
-            (nombre, apellido, email, telefono, cargo, estado, id_genero, id_area, id_rol)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
+             email, telefono, cargo, estado, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, fecha_fin)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
-        const result = await query(sql, [
-            nombre, apellido, email, telefono, cargo,
-            estado, id_genero, id_area, id_rol
-        ]);
+        const params = [
+            Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
+            email, telefono, cargo, estado, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, fecha_fin
+        ];
+        
+        const result = await query(sql, params);
         
         return result.insertId;
     }
@@ -65,46 +65,54 @@ class EmpleadoModel {
     // Actualizar empleado
     static async update(id, empleadoData) {
         const {
-            nombre,
-            apellido,
-            email,
-            telefono,
-            cargo,
-            id_genero,
-            id_area,
-            id_rol,
-            estado
+            Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
+            email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
+            fecha_fin, estado
         } = empleadoData;
 
         // Convertir undefined a null para compatibilidad con MySQL2
         const safeData = {
+            Identificacion: Identificacion ?? null,
+            tipo_identificacion: tipo_identificacion ?? null,
             nombre: nombre ?? null,
             apellido: apellido ?? null,
+            fecha_nacimiento: fecha_nacimiento ?? null,
             email: email ?? null,
             telefono: telefono ?? null,
             cargo: cargo ?? null,
             id_genero: id_genero ?? null,
             id_area: id_area ?? null,
-            id_rol: id_rol ?? null,
+            id_ubicacion: id_ubicacion ?? null,
+            fecha_inicio: fecha_inicio ?? null,
+            sueldo: sueldo ?? null,
+            fecha_fin: fecha_fin ?? null,
             estado: estado ?? 1
         };
         
         const sql = `
             UPDATE Empleado 
-            SET nombre = ?, apellido = ?, email = ?, telefono = ?, 
-                cargo = ?, id_genero = ?, id_area = ?, id_rol = ?, estado = ?
+            SET Identificacion = ?, tipo_identificacion = ?, nombre = ?, apellido = ?, 
+                fecha_nacimiento = ?, email = ?, telefono = ?, cargo = ?, 
+                id_genero = ?, id_area = ?, id_ubicacion = ?, fecha_inicio = ?, sueldo = ?, 
+                fecha_fin = ?, estado = ?
             WHERE id_empleado = ?
         `;
         
         const result = await query(sql, [
+            safeData.Identificacion,
+            safeData.tipo_identificacion,
             safeData.nombre,
             safeData.apellido,
+            safeData.fecha_nacimiento,
             safeData.email,
             safeData.telefono,
             safeData.cargo,
             safeData.id_genero,
             safeData.id_area,
-            safeData.id_rol,
+            safeData.id_ubicacion,
+            safeData.fecha_inicio,
+            safeData.sueldo,
+            safeData.fecha_fin,
             safeData.estado,
             id
         ]);
@@ -124,11 +132,9 @@ class EmpleadoModel {
         const sql = `
             SELECT 
                 e.*,
-                g.nombre as genero_nombre,
-                r.nombre_rol
+                g.nombre as genero_nombre
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
             WHERE e.id_area = ? AND e.estado = 1
             ORDER BY e.apellido, e.nombre
         `;
@@ -141,12 +147,10 @@ class EmpleadoModel {
             SELECT 
                 e.*,
                 g.nombre as genero_nombre,
-                a.nombre_area,
-                r.nombre_rol
+                a.nombre_area
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
             WHERE (e.nombre LIKE ? OR e.apellido LIKE ? OR e.email LIKE ?)
                 AND e.estado = 1
             ORDER BY e.apellido, e.nombre
@@ -162,18 +166,61 @@ class EmpleadoModel {
                 e.*,
                 g.nombre as genero_nombre,
                 a.nombre_area,
-                r.nombre_rol,
                 u.nombre as ubicacion_nombre,
                 u.id_ubicacion
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
-            LEFT JOIN Ubicacion u ON a.id_ubicacion = u.id_ubicacion
+            LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
             WHERE e.email = ? AND e.estado = 1
         `;
         const result = await query(sql, [email]);
         return result[0];
+    }
+
+    // Obtener empleados sin usuario asignado (para módulo de usuarios)
+    static async getEmpleadosSinUsuario() {
+        const sql = `
+            SELECT 
+                e.*,
+                g.nombre as genero_nombre,
+                a.nombre_area
+            FROM Empleado e
+            LEFT JOIN Genero g ON e.id_genero = g.id_genero
+            LEFT JOIN Area a ON e.id_area = a.id_area
+            LEFT JOIN Usuario u ON e.id_empleado = u.id_empleado
+            WHERE u.id_empleado IS NULL AND e.estado = 1
+            ORDER BY e.apellido, e.nombre
+        `;
+        return await query(sql);
+    }
+
+    // Verificar si la identificación ya existe
+    static async existeIdentificacion(identificacion, excludeId = null) {
+        let sql = 'SELECT id_empleado FROM Empleado WHERE Identificacion = ?';
+        const params = [identificacion];
+        
+        if (excludeId) {
+            sql += ' AND id_empleado != ?';
+            params.push(excludeId);
+        }
+        
+        const result = await query(sql, params);
+        return result.length > 0;
+    }
+
+    // Verificar si el email ya existe
+    static async existeEmail(email, excludeId = null) {
+        let sql = 'SELECT id_empleado FROM Empleado WHERE email = ?';
+        const params = [email];
+        
+        if (excludeId) {
+            sql += ' AND id_empleado != ?';
+            params.push(excludeId);
+        }
+        
+        const result = await query(sql, params);
+        return result.length > 0;
     }
 }
 

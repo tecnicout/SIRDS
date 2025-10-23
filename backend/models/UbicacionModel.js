@@ -37,11 +37,10 @@ class UbicacionModel {
         return result.affectedRows > 0;
     }
 
-    // Verificar áreas relacionadas con la ubicación
+    // Verificar áreas relacionadas con la ubicación (ya no aplicable en la nueva estructura)
     static async getRelatedAreas(id) {
-        const sql = 'SELECT COUNT(*) as count FROM area WHERE id_ubicacion = ?';
-        const result = await query(sql, [id]);
-        return result[0].count;
+        // En la nueva estructura, las áreas no dependen de ubicaciones
+        return 0;
     }
 
     // Desvincular áreas relacionadas y eliminar ubicación

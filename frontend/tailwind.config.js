@@ -38,6 +38,10 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['Poppins', 'system-ui', 'sans-serif'],
+        rubik: ['Rubik', 'system-ui', 'sans-serif'],
+        inter: ['Inter', 'system-ui', 'sans-serif'],
+        roboto: ['Roboto', 'system-ui', 'sans-serif'],
+        boris: ['BorisBlackBloxx', 'system-ui', 'sans-serif'],
       },
     },
   },

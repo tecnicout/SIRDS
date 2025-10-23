@@ -1,39 +1,266 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import DataTable from '../components/DataTable/DataTable';
+import { ViewModal, EditModal } from '../components/Modal';
+
+// Configuración de columnas para la tabla de usuarios
+const USUARIOS_COLUMNS = [
+  {
+    key: 'username',
+    label: 'Usuario',
+    sortable: true,
+    render: (value, row) => (
+      <div className="flex items-center">
+        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+          <span className="text-green-600 font-medium text-sm">
+            {value?.charAt(0)?.toUpperCase() || 'U'}
+          </span>
+        </div>
+        <div className="ml-4">
+          <div className="text-sm font-medium text-gray-900">
+            {value}
+          </div>
+          <div className="text-sm text-gray-500">
+            {row.email_usuario}
+          </div>
+        </div>
+      </div>
+    )
+  },
+  {
+    key: 'empleado_info',
+    label: 'Empleado',
+    sortable: true,
+    render: (value, row) => (
+      <div>
+        <div className="text-sm font-medium text-gray-900">
+          {row.nombre} {row.apellido}
+        </div>
+        <div className="text-sm text-gray-500">
+          {row.cargo}
+        </div>
+      </div>
+    )
+  },
+  {
+    key: 'nombre_rol',
+    label: 'Rol Sistema',
+    sortable: true,
+    render: (value, row) => {
+      const getRolBadgeColor = (rol) => {
+        switch (rol) {
+          case 'Administrador':
+            return 'bg-red-100 text-red-800';
+          case 'Recursos Humanos':
+            return 'bg-blue-100 text-blue-800';
+          case 'Almacen':
+            return 'bg-green-100 text-green-800';
+          case 'Compras':
+            return 'bg-purple-100 text-purple-800';
+          default:
+            return 'bg-gray-100 text-gray-800';
+        }
+      };
+      
+      return (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRolBadgeColor(value)}`}>
+          {value || 'Sin rol'}
+        </span>
+      );
+    }
+  },
+  {
+    key: 'usuario_activo',
+    label: 'Estado',
+    align: 'center',
+    render: (value, row) => (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+        value 
+          ? 'bg-green-100 text-green-800' 
+          : 'bg-red-100 text-red-800'
+      }`}>
+        {value ? 'Activo' : 'Inactivo'}
+      </span>
+    )
+  },
+  {
+    key: 'ultimo_acceso',
+    label: 'Último Acceso',
+    sortable: true,
+    render: (value, row) => (
+      <div className="text-sm text-gray-500">
+        {value 
+          ? new Date(value).toLocaleDateString('es-ES', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          : 'Nunca'
+        }
+      </div>
+    )
+  }
+];
+
+// Configuración de campos para el modal de vista
+const USUARIO_VIEW_FIELDS = [
+  { key: 'id_usuario', label: 'ID Usuario' },
+  { key: 'username', label: 'Username' },
+  { key: 'email_usuario', label: 'Email' },
+  { 
+    key: 'empleado_info', 
+    label: 'Empleado', 
+    render: (value, data) => `${data.nombre} ${data.apellido}` 
+  },
+  { key: 'cargo', label: 'Cargo' },
+  { key: 'nombre_rol', label: 'Rol del Sistema' },
+  { 
+    key: 'usuario_activo', 
+    label: 'Estado',
+    render: (value) => value ? 'Activo' : 'Inactivo'
+  },
+  { 
+    key: 'ultimo_acceso', 
+    label: 'Último Acceso',
+    render: (value) => value 
+      ? new Date(value).toLocaleDateString('es-ES', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : 'Nunca'
+  }
+];
+
+// Configuración de campos para el modal de edición
+const USUARIO_FORM_FIELDS = [
+  {
+    name: 'username',
+    label: 'Username',
+    type: 'text',
+    required: true,
+    placeholder: 'Nombre de usuario',
+    fullWidth: true
+  },
+  {
+    name: 'email',
+    label: 'Email',
+    type: 'email',
+    required: true,
+    placeholder: 'email@ejemplo.com',
+    fullWidth: true
+  },
+  {
+    name: 'id_rol',
+    label: 'Rol del Sistema',
+    type: 'select',
+    required: true,
+    placeholder: 'Seleccionar rol',
+    fullWidth: true,
+    options: [
+      { value: '1', label: 'Compras' },
+      { value: '2', label: 'Almacén' },
+      { value: '3', label: 'Recursos Humanos' },
+      { value: '4', label: 'Administrador' }
+    ]
+  }
+];
+
+// Configuración de campos para el modal de creación
+const USUARIO_CREATE_FORM_FIELDS = [
+  {
+    name: 'id_empleado',
+    label: 'Empleado',
+    type: 'select',
+    required: true,
+    placeholder: 'Seleccionar empleado',
+    fullWidth: true,
+    options: [] // Se llenará dinámicamente
+  },
+  {
+    name: 'username',
+    label: 'Username',
+    type: 'text',
+    required: true,
+    placeholder: 'Nombre de usuario',
+    fullWidth: true
+  },
+  {
+    name: 'email',
+    label: 'Email',
+    type: 'email',
+    required: true,
+    placeholder: 'email@ejemplo.com',
+    fullWidth: true
+  },
+  {
+    name: 'password',
+    label: 'Contraseña',
+    type: 'password',
+    required: true,
+    placeholder: 'Mínimo 6 caracteres',
+    fullWidth: true
+  },
+  {
+    name: 'id_rol',
+    label: 'Rol del Sistema',
+    type: 'select',
+    required: true,
+    placeholder: 'Seleccionar rol',
+    fullWidth: true,
+    options: [
+      { value: '1', label: 'Compras' },
+      { value: '2', label: 'Almacén' },
+      { value: '3', label: 'Recursos Humanos' },
+      { value: '4', label: 'Administrador' }
+    ]
+  }
+];
+
+// Reglas de validación
+const USUARIO_VALIDATION_RULES = {
+  username: { required: true },
+  email: { required: true, email: true },
+  id_rol: { required: true },
+  id_empleado: { required: true },
+  password: { required: true, custom: (value) => value && value.length < 6 ? 'La contraseña debe tener al menos 6 caracteres' : null }
+};
 
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [empleadosSinUsuario, setEmpleadosSinUsuario] = useState([]);
-  const [filtro, setFiltro] = useState('');
-  const [rolFiltro, setRolFiltro] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
   const [stats, setStats] = useState(null);
+  
+  // Estados para modales
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Cargar datos iniciales
-  useEffect(() => {
-    cargarDatos();
-  }, []);
+  // Estados para búsqueda y filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [rolFiltro, setRolFiltro] = useState('');
 
-  const cargarDatos = async () => {
-    try {
-      setIsLoading(true);
-      await Promise.all([
-        cargarUsuarios(),
-        cargarEmpleadosSinUsuario(),
-        cargarEstadisticas()
-      ]);
-    } catch (error) {
-      console.error('Error cargando datos:', error);
-      setError('Error al cargar datos');
-    } finally {
-      setIsLoading(false);
-    }
+  // Toast notification system
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // Show toast function
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 2500);
   };
 
-  const cargarUsuarios = async () => {
+  // Fix: Usar useCallback para evitar bucle infinito en useEffect
+  const cargarUsuarios = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/usuarios', {
@@ -46,6 +273,7 @@ export default function Usuarios() {
       if (response.ok) {
         const result = await response.json();
         setUsuarios(result.data || []);
+        setError('');
       } else {
         throw new Error('Error al cargar usuarios');
       }
@@ -53,9 +281,10 @@ export default function Usuarios() {
       console.error('Error:', error);
       setError('Error al cargar usuarios');
     }
-  };
+  }, []);
 
-  const cargarEmpleadosSinUsuario = async () => {
+  // Fix: Usar useCallback para cargarEmpleadosSinUsuario
+  const cargarEmpleadosSinUsuario = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/usuarios/employees-without-user', {
@@ -72,9 +301,10 @@ export default function Usuarios() {
     } catch (error) {
       console.error('Error cargando empleados sin usuario:', error);
     }
-  };
+  }, []);
 
-  const cargarEstadisticas = async () => {
+  // Fix: Usar useCallback para cargarEstadisticas
+  const cargarEstadisticas = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/usuarios/stats', {
@@ -91,22 +321,67 @@ export default function Usuarios() {
     } catch (error) {
       console.error('Error cargando estadísticas:', error);
     }
-  };
+  }, []);
+
+  // Fix: Función de carga completa con useCallback
+  const cargarDatos = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      await Promise.all([
+        cargarUsuarios(),
+        cargarEmpleadosSinUsuario(),
+        cargarEstadisticas()
+      ]);
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+      setError('Error al cargar datos');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cargarUsuarios, cargarEmpleadosSinUsuario, cargarEstadisticas]);
+
+  // Cargar datos al iniciar el componente
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   // Filtrar usuarios
   const usuariosFiltrados = usuarios.filter(usuario => {
     const matchesText = (
-      usuario.username?.toLowerCase().includes(filtro.toLowerCase()) ||
-      usuario.nombre?.toLowerCase().includes(filtro.toLowerCase()) ||
-      usuario.apellido?.toLowerCase().includes(filtro.toLowerCase()) ||
-      usuario.email_usuario?.toLowerCase().includes(filtro.toLowerCase())
+      usuario.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      usuario.nombre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      usuario.apellido?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      usuario.email_usuario?.toLowerCase().includes(searchQuery.toLowerCase())
     );
     
-    const matchesRole = !rolFiltro || usuario.rol_sistema === rolFiltro;
+    const matchesRole = !rolFiltro || usuario.nombre_rol === rolFiltro;
     
     return matchesText && matchesRole;
   });
 
+  // Manejar acciones de fila del DataTable
+  const handleRowAction = (action, usuario) => {
+    switch (action) {
+      case 'view':
+        setSelectedUser(usuario);
+        setShowViewModal(true);
+        break;
+      case 'edit':
+        setEditingUser(usuario);
+        setShowEditModal(true);
+        break;
+      case 'toggle':
+        handleToggleStatus(usuario);
+        break;
+      case 'reset':
+        handleResetPassword(usuario);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Función para cambiar estado del usuario
   const handleToggleStatus = async (usuario) => {
     try {
       const token = localStorage.getItem('token');
@@ -124,30 +399,27 @@ export default function Usuarios() {
 
       if (response.ok) {
         await cargarUsuarios();
+        showToast(`Usuario ${usuario.usuario_activo ? 'desactivado' : 'activado'} correctamente`, 'success');
         setError('');
       } else {
         const result = await response.json();
-        setError(result.message || 'Error al cambiar estado del usuario');
+        showToast(result.message || 'Error al cambiar estado del usuario', 'error');
       }
     } catch (error) {
       console.error('Error:', error);
-      setError('Error de conexión');
+      showToast('Error de conexión', 'error');
     }
   };
 
-  const handleEdit = (usuario) => {
-    setSelectedUser(usuario);
-    setShowEditModal(true);
-  };
-
+  // Función para resetear contraseña
   const handleResetPassword = async (usuario) => {
-    if (!confirm(`¿Estás seguro de que quieres resetear la contraseña de ${usuario.username}?`)) {
+    if (!window.confirm(`¿Estás seguro de que quieres resetear la contraseña de ${usuario.username}?`)) {
       return;
     }
 
     const newPassword = prompt('Ingresa la nueva contraseña (mínimo 6 caracteres):');
     if (!newPassword || newPassword.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres');
+      showToast('La contraseña debe tener al menos 6 caracteres', 'error');
       return;
     }
 
@@ -163,106 +435,174 @@ export default function Usuarios() {
       });
 
       if (response.ok) {
-        alert('Contraseña restablecida correctamente');
+        showToast('Contraseña restablecida correctamente', 'success');
         setError('');
       } else {
         const result = await response.json();
-        setError(result.message || 'Error al resetear contraseña');
+        showToast(result.message || 'Error al resetear contraseña', 'error');
       }
     } catch (error) {
       console.error('Error:', error);
-      setError('Error de conexión');
+      showToast('Error de conexión', 'error');
     }
   };
 
-  const getRolBadgeColor = (rol) => {
-    switch (rol) {
-      case 'administrador':
-        return 'bg-red-100 text-red-800';
-      case 'recursos_humanos':
-        return 'bg-blue-100 text-blue-800';
-      case 'almacen':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  // Manejar envío del formulario de edición
+  const handleEditSubmit = async (formData) => {
+    try {
+      setIsSubmitting(true);
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/usuarios/${editingUser.id_usuario}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        await cargarUsuarios();
+        setShowEditModal(false);
+        setEditingUser(null);
+        showToast(result.message || 'Usuario actualizado correctamente', 'success');
+        setError('');
+      } else {
+        showToast(result.message || 'Error al actualizar usuario', 'error');
+      }
+    } catch (error) {
+      console.error('Error al actualizar usuario:', error);
+      showToast('Error al actualizar usuario', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const formatRoleName = (rol) => {
-    switch (rol) {
-      case 'administrador':
-        return 'Administrador';
-      case 'recursos_humanos':
-        return 'Recursos Humanos';
-      case 'almacen':
-        return 'Almacén';
-      default:
-        return rol;
+  // Manejar envío del formulario de creación
+  const handleCreateSubmit = async (formData) => {
+    try {
+      setIsSubmitting(true);
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('/api/usuarios', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        await cargarDatos(); // Recargar todo para actualizar empleados sin usuario
+        setShowCreateModal(false);
+        showToast(result.message || 'Usuario creado correctamente', 'success');
+        setError('');
+      } else {
+        showToast(result.message || 'Error al crear usuario', 'error');
+      }
+    } catch (error) {
+      console.error('Error al crear usuario:', error);
+      showToast('Error al crear usuario', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const handleNewUser = () => {
+    setShowCreateModal(true);
+  };
+
+  // Preparar opciones de empleados para el formulario de creación
+  const empleadosOptions = empleadosSinUsuario.map(empleado => ({
+    value: empleado.id_empleado,
+    label: `${empleado.nombre} ${empleado.apellido} - ${empleado.cargo}`
+  }));
+
+  // Actualizar campos del formulario de creación con opciones de empleados
+  const createFormFieldsWithOptions = USUARIO_CREATE_FORM_FIELDS.map(field => {
+    if (field.name === 'id_empleado') {
+      return { ...field, options: empleadosOptions };
+    }
+    return field;
+  });
 
   if (isLoading) {
     return (
-      <div className="p-8 text-center">
-        <div className="inline-flex items-center space-x-2">
-          <svg className="animate-spin h-5 w-5 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span className="text-gray-600">Cargando usuarios...</span>
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-300 rounded w-1/4 mb-6"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-16 bg-gray-300 rounded"></div>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Usuarios</h1>
           <p className="text-gray-600">Administra los usuarios del sistema SIRDS</p>
         </div>
-        <button 
-          onClick={() => setShowCreateModal(true)}
-          className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors flex items-center space-x-2"
+        <button
+          onClick={handleNewUser}
+          className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-5 py-2.5 font-medium transition-all duration-200 flex items-center gap-2 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          <span>Nuevo Usuario</span>
+          Nuevo Usuario
         </button>
       </div>
 
-      {/* Mensaje de error */}
+      {/* Mensajes de error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-xl">
           {error}
         </div>
       )}
 
-      {/* Estadísticas */}
+      {/* Estadísticas rápidas */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Usuarios</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total_usuarios}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.total_usuarios}
+                </p>
+                <p className="text-gray-600 text-sm">
+                  Total Usuarios
+                </p>
               </div>
-              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                 </svg>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow border">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Activos</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.usuarios_activos}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.usuarios_activos}
+                </p>
+                <p className="text-gray-600 text-sm">
+                  Activos
+                </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,11 +612,15 @@ export default function Usuarios() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow border">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Administradores</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.administradores}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.administradores}
+                </p>
+                <p className="text-gray-600 text-sm">
+                  Administradores
+                </p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,11 +630,15 @@ export default function Usuarios() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow border">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Último Mes</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activos_ultimo_mes}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.activos_ultimo_mes}
+                </p>
+                <p className="text-gray-600 text-sm">
+                  Último Mes
+                </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -302,41 +650,29 @@ export default function Usuarios() {
         </div>
       )}
 
-      {/* Filtros */}
-      <div className="bg-white p-6 rounded-lg shadow border">
+      {/* Filtros adicionales para usuarios */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Buscar usuarios
-            </label>
-            <input
-              type="text"
-              placeholder="Nombre, username, email..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
-            />
-          </div>
-          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Filtrar por rol
             </label>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               value={rolFiltro}
               onChange={(e) => setRolFiltro(e.target.value)}
             >
               <option value="">Todos los roles</option>
-              <option value="administrador">Administrador</option>
-              <option value="recursos_humanos">Recursos Humanos</option>
-              <option value="almacen">Almacén</option>
+              <option value="Administrador">Administrador</option>
+              <option value="Recursos Humanos">Recursos Humanos</option>
+              <option value="Almacen">Almacén</option>
+              <option value="Compras">Compras</option>
             </select>
           </div>
 
           <div className="flex items-end">
             <button
-              onClick={() => { setFiltro(''); setRolFiltro(''); }}
+              onClick={() => { setSearchQuery(''); setRolFiltro(''); }}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Limpiar filtros
@@ -345,533 +681,167 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* Lista de usuarios */}
-      <div className="bg-white shadow border rounded-lg overflow-hidden">
-        {usuariosFiltrados.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            {filtro || rolFiltro ? 'No se encontraron usuarios que coincidan con los filtros' : 'No hay usuarios registrados'}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Usuario
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Empleado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rol Sistema
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Último Acceso
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {usuariosFiltrados.map((usuario) => (
-                  <tr key={usuario.id_usuario} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                          <span className="text-primary-600 font-medium text-sm">
-                            {usuario.username?.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {usuario.username}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {usuario.email_usuario}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {usuario.nombre} {usuario.apellido}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {usuario.cargo}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRolBadgeColor(usuario.rol_sistema)}`}>
-                        {formatRoleName(usuario.rol_sistema)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        usuario.usuario_activo 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {usuario.usuario_activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {usuario.ultimo_acceso 
-                        ? new Date(usuario.ultimo_acceso).toLocaleDateString('es-ES', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : 'Nunca'
-                      }
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button 
-                          onClick={() => handleEdit(usuario)}
-                          className="text-primary-600 hover:text-primary-900"
-                          title="Editar usuario"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
-                        <button 
-                          onClick={() => handleToggleStatus(usuario)}
-                          className={usuario.usuario_activo ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}
-                          title={usuario.usuario_activo ? "Desactivar usuario" : "Activar usuario"}
-                        >
-                          {usuario.usuario_activo ? (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          )}
-                        </button>
-                        <button 
-                          onClick={() => handleResetPassword(usuario)}
-                          className="text-orange-600 hover:text-orange-900"
-                          title="Resetear contraseña"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2m-2-2a2 2 0 00-2 2m2-2V5a2 2 0 00-2-2H9a2 2 0 00-2 2v2m0 0a2 2 0 00-2 2m2-2a2 2 0 012 2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* DataTable */}
+      <DataTable
+        columns={USUARIOS_COLUMNS}
+        data={usuariosFiltrados}
+        rowKey="id_usuario"
+        loading={isLoading}
+        error={error}
+        searchQuery={searchQuery}
+        onSearch={setSearchQuery}
+        searchPlaceholder="Buscar por usuario, nombre, email..."
+        onRowAction={handleRowAction}
+        actions={[
+          {
+            label: 'Ver',
+            action: 'view',
+            icon: (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            ),
+            className: 'text-blue-600 hover:text-blue-900'
+          },
+          {
+            label: 'Editar',
+            action: 'edit',
+            icon: (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            ),
+            className: 'text-green-600 hover:text-green-900'
+          },
+          {
+            label: (row) => row.usuario_activo ? 'Desactivar' : 'Activar',
+            action: 'toggle',
+            icon: (row) => row.usuario_activo ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ),
+            className: (row) => row.usuario_activo ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
+          },
+          {
+            label: 'Reset Password',
+            action: 'reset',
+            icon: (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2m-2-2a2 2 0 00-2 2m2-2V5a2 2 0 00-2-2H9a2 2 0 00-2 2v2m0 0a2 2 0 00-2 2m2-2a2 2 0 012 2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ),
+            className: 'text-orange-600 hover:text-orange-900'
+          }
+        ]}
+        emptyState={{
+          icon: (
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+            </svg>
+          ),
+          title: 'No hay usuarios disponibles',
+          description: searchQuery || rolFiltro ? 'No se encontraron usuarios que coincidan con los filtros' : 'Comience creando un nuevo usuario',
+          action: {
+            label: 'Crear Primer Usuario',
+            onClick: handleNewUser
+          }
+        }}
+      />
 
-      {/* Modales */}
-      {showCreateModal && (
-        <ModalCrearUsuario 
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          empleadosSinUsuario={empleadosSinUsuario}
-          onSuccess={() => {
-            cargarDatos();
-            setShowCreateModal(false);
+      {/* Modal de Vista */}
+      <ViewModal
+        isOpen={showViewModal}
+        onClose={() => setShowViewModal(false)}
+        title="Detalles del Usuario"
+        data={selectedUser}
+        fields={USUARIO_VIEW_FIELDS}
+        size="md"
+      />
+
+      {/* Modal de Edición */}
+      <EditModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingUser(null);
+        }}
+        onSubmit={handleEditSubmit}
+        title="Editar Usuario"
+        initialData={editingUser ? {
+          username: editingUser.username,
+          email: editingUser.email_usuario,
+          id_rol: editingUser.id_rol?.toString()
+        } : {}}
+        fields={USUARIO_FORM_FIELDS}
+        validationRules={USUARIO_VALIDATION_RULES}
+        size="md"
+        isSubmitting={isSubmitting}
+        submitText="Actualizar"
+      />
+
+      {/* Modal de Creación */}
+      <EditModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateSubmit}
+        title="Crear Nuevo Usuario"
+        initialData={{}}
+        fields={createFormFieldsWithOptions}
+        validationRules={USUARIO_VALIDATION_RULES}
+        size="md"
+        isSubmitting={isSubmitting}
+        submitText="Crear Usuario"
+      />
+
+      {/* Toast Notification with Animated Icons */}
+      {toast.show && (
+        <div
+          className={`fixed bottom-6 right-6 flex items-center space-x-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all duration-300 transform ${
+            toast.type === 'success'
+              ? 'bg-green-600 animate-fade-in-up'
+              : 'bg-red-600 animate-fade-in-up'
+          }`}
+          style={{
+            animation: 'fade-in-up 0.4s ease-out'
           }}
-        />
+        >
+          {/* Icono dinámico */}
+          <div className="flex-shrink-0">
+            {toast.type === 'success' ? (
+              <span className="animate-bounce text-xl">✅</span>
+            ) : (
+              <span className="animate-pulse text-xl">❌</span>
+            )}
+          </div>
+
+          {/* Mensaje */}
+          <div>{toast.message}</div>
+        </div>
       )}
 
-      {showEditModal && selectedUser && (
-        <ModalEditarUsuario 
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedUser(null);
-          }}
-          usuario={selectedUser}
-          onSuccess={() => {
-            cargarUsuarios();
-            setShowEditModal(false);
-            setSelectedUser(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// Modal para crear usuario
-function ModalCrearUsuario({ isOpen, onClose, empleadosSinUsuario, onSuccess }) {
-  const [formData, setFormData] = useState({
-    id_empleado: '',
-    username: '',
-    email: '',
-    password: '',
-    rol_sistema: ''
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleEmpleadoChange = (e) => {
-    const empleadoId = e.target.value;
-    const empleado = empleadosSinUsuario.find(emp => emp.id_empleado === parseInt(empleadoId));
-    
-    if (empleado) {
-      // Función para limpiar caracteres especiales del username
-      const limpiarTexto = (texto) => {
-        return texto
-          .toLowerCase()
-          .replace(/[áàäâ]/g, 'a')
-          .replace(/[éèëê]/g, 'e')
-          .replace(/[íìïî]/g, 'i')
-          .replace(/[óòöô]/g, 'o')
-          .replace(/[úùüû]/g, 'u')
-          .replace(/ñ/g, 'n')
-          .replace(/[^a-z0-9]/g, '')
-          .replace(/\s+/g, '');
-      };
-
-      const usernameGenerado = `${limpiarTexto(empleado.nombre)}.${limpiarTexto(empleado.apellido)}`;
-      
-      setFormData(prev => ({
-        ...prev,
-        id_empleado: empleadoId,
-        email: empleado.email || '',
-        username: usernameGenerado
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        id_empleado: empleadoId,
-        email: '',
-        username: ''
-      }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    console.log('[FRONTEND] Datos del formulario antes de enviar:', formData);
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/usuarios', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      console.log('[FRONTEND] Status de respuesta:', response.status);
-      const result = await response.json();
-      console.log('[FRONTEND] Respuesta completa:', result);
-
-      if (result.success) {
-        onSuccess();
-      } else {
-        setError(result.message || 'Error al crear usuario');
-        if (result.errors) {
-          console.log('[FRONTEND] Errores de validación:', result.errors);
+      {/* Custom CSS Animation */}
+      <style jsx>{`
+        @keyframes fade-in-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
-      }
-    } catch (error) {
-      console.error('[FRONTEND] Error de conexión:', error);
-      setError('Error de conexión');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-screen overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">Crear Nuevo Usuario</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Empleado
-            </label>
-            <select
-              name="id_empleado"
-              value={formData.id_empleado}
-              onChange={handleEmpleadoChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              required
-            >
-              <option value="">Seleccionar empleado...</option>
-              {empleadosSinUsuario.map((empleado) => (
-                <option key={empleado.id_empleado} value={empleado.id_empleado}>
-                  {empleado.nombre} {empleado.apellido} - {empleado.cargo}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Username
-            </label>
-            <input
-              type="text"
-              name="username"
-              value={formData.username}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Contraseña
-            </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              minLength="6"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rol del Sistema
-            </label>
-            <select
-              name="rol_sistema"
-              value={formData.rol_sistema}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              required
-            >
-              <option value="">Seleccionar rol...</option>
-              <option value="administrador">Administrador</option>
-              <option value="recursos_humanos">Recursos Humanos</option>
-              <option value="almacen">Almacén</option>
-            </select>
-          </div>
-
-          <div className="flex space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 bg-primary-500 text-white py-2 rounded-lg font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50"
-            >
-              {isLoading ? 'Creando...' : 'Crear Usuario'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// Modal para editar usuario
-function ModalEditarUsuario({ isOpen, onClose, usuario, onSuccess }) {
-  const [formData, setFormData] = useState({
-    username: usuario?.username || '',
-    email: usuario?.email_usuario || '',
-    rol_sistema: usuario?.rol_sistema || ''
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/usuarios/${usuario.id_usuario}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        onSuccess();
-      } else {
-        setError(result.message || 'Error al actualizar usuario');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Error de conexión');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-screen overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">Editar Usuario</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Usuario (Empleado)
-            </label>
-            <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
-              {usuario?.nombre} {usuario?.apellido}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Username
-            </label>
-            <input
-              type="text"
-              name="username"
-              value={formData.username}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rol del Sistema
-            </label>
-            <select
-              name="rol_sistema"
-              value={formData.rol_sistema}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              required
-            >
-              <option value="administrador">Administrador</option>
-              <option value="recursos_humanos">Recursos Humanos</option>
-              <option value="almacen">Almacén</option>
-            </select>
-          </div>
-
-          <div className="flex space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 bg-primary-500 text-white py-2 rounded-lg font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50"
-            >
-              {isLoading ? 'Actualizando...' : 'Actualizar'}
-            </button>
-          </div>
-        </form>
-      </div>
+        .animate-fade-in-up {
+          animation: fade-in-up 0.4s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

@@ -6,6 +6,9 @@ const authMiddleware = require('../middleware/authMiddleware');
 // Login
 router.post('/login', AuthController.login);
 
+// Validar token de sesión
+router.get('/validate', authMiddleware, AuthController.validateToken);
+
 // Información del usuario autenticado
 router.get('/me', authMiddleware, AuthController.me);
 
@@ -20,5 +23,18 @@ router.get('/check-permission', authMiddleware, AuthController.checkPermission);
 
 // Estadísticas de autenticación (Solo Admin)
 router.get('/stats', authMiddleware, AuthController.getAuthStats);
+
+// ===================================
+// RUTAS DE RESTABLECIMIENTO DE CONTRASEÑA
+// ===================================
+
+// Solicitar restablecimiento de contraseña
+router.post('/forgot-password', AuthController.forgotPassword);
+
+// Restablecer contraseña con token
+router.post('/reset-password/:token', AuthController.resetPassword);
+
+// Validar token de restablecimiento (opcional, para UX)
+router.get('/reset-password/:token/validate', AuthController.validateResetToken);
 
 module.exports = router;

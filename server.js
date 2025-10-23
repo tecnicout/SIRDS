@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3001;
 // Middlewares de seguridad
 app.use(helmet());
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+    origin: ['http://localhost:3001', 'http://localhost:5173'],
     credentials: true
 }));
 
@@ -33,7 +33,7 @@ const areaRoutes = require('./backend/routes/areaRoutes');
 const generoRoutes = require('./backend/routes/generoRoutes');
 const rolRoutes = require('./backend/routes/rolRoutes');
 const empleadoRoutes = require('./backend/routes/empleadoRoutes');
-const proveedorRoutes = require('./backend/routes/proveedorRoutes');
+const proveedorRoutes = require('./backend/routes/proveedores');
 const categoriaRoutes = require('./backend/routes/categoriaRoutes');
 const dotacionRoutes = require('./backend/routes/dotacionRoutes');
 const tallaRoutes = require('./backend/routes/tallaRoutes');
@@ -92,6 +92,23 @@ app.listen(PORT, () => {
     console.log(`🚀 Servidor SIRDS ejecutándose en puerto ${PORT}`);
     console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🌐 URL: http://localhost:${PORT}`);
+}).on('error', (err) => {
+    console.error('❌ Error al iniciar servidor:', err.message);
+    if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Puerto ${PORT} ya está en uso`);
+        process.exit(1);
+    }
+});
+
+// Manejo de errores no capturados
+process.on('uncaughtException', (err) => {
+    console.error('❌ Error no capturado:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Promesa rechazada no manejada:', reason);
+    process.exit(1);
 });
 
 module.exports = app;

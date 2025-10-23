@@ -9,7 +9,6 @@ router.use(authMiddleware);
 // Rutas para áreas
 router.get('/', AreaController.getAll);
 router.get('/todas', AreaController.getAllWithInactive); // Para auditoría (activas e inactivas)
-router.get('/ubicacion/:id_ubicacion', AreaController.getByUbicacion);
 router.get('/:id', AreaController.getById);
 router.post('/', AreaController.create);
 router.put('/:id', AreaController.update);

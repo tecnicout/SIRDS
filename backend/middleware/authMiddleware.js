@@ -72,7 +72,32 @@ const authMiddleware = async (req, res, next) => {
 };
 
 /**
- * Middleware para verificar roles específicos
+ * Middleware para verificar roles específicos por ID
+ * @param {Array} idsRolesPermitidos - Array de IDs de roles que pueden acceder
+ * @returns {Function} Middleware function
+ */
+const requireRoleById = (idsRolesPermitidos) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Usuario no autenticado'
+            });
+        }
+
+        if (!idsRolesPermitidos.includes(req.user.id_rol)) {
+            return res.status(403).json({
+                success: false,
+                message: `Acceso denegado. Solo administradores pueden realizar esta acción.`
+            });
+        }
+
+        next();
+    };
+};
+
+/**
+ * Middleware para verificar roles específicos (mantener compatibilidad)
  * @param {Array} rolesPermitidos - Array de roles que pueden acceder
  * @returns {Function} Middleware function
  */
@@ -85,7 +110,7 @@ const requireRole = (rolesPermitidos) => {
             });
         }
 
-        if (!rolesPermitidos.includes(req.user.rol_sistema)) {
+        if (!rolesPermitidos.includes(req.user.nombre_rol)) {
             return res.status(403).json({
                 success: false,
                 message: `Acceso denegado. Roles requeridos: ${rolesPermitidos.join(', ')}`
@@ -132,7 +157,12 @@ const requirePermission = (accion) => {
 };
 
 /**
- * Middleware para permitir solo administradores
+ * Middleware para permitir solo administradores (usando ID de rol)
+ */
+const requireAdminById = requireRoleById([4]); // Solo id_rol = 4 (Administrador)
+
+/**
+ * Middleware para permitir solo administradores (compatibilidad)
  */
 const requireAdmin = requireRole(['administrador']);
 
@@ -149,7 +179,9 @@ const requireAdminOrWarehouse = requireRole(['administrador', 'almacen']);
 module.exports = authMiddleware; // Export por defecto para compatibilidad
 module.exports.authMiddleware = authMiddleware;
 module.exports.requireRole = requireRole;
+module.exports.requireRoleById = requireRoleById;
 module.exports.requirePermission = requirePermission;
 module.exports.requireAdmin = requireAdmin;
+module.exports.requireAdminById = requireAdminById;
 module.exports.requireAdminOrHR = requireAdminOrHR;
 module.exports.requireAdminOrWarehouse = requireAdminOrWarehouse;

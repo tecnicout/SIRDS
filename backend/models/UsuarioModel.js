@@ -19,7 +19,7 @@ class UsuarioModel {
                 u.username,
                 u.email as email_usuario,
                 u.password,
-                u.rol_sistema,
+                u.id_rol,
                 u.activo as usuario_activo,
                 u.ultimo_acceso,
                 e.id_empleado,
@@ -35,8 +35,8 @@ class UsuarioModel {
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
-            LEFT JOIN Ubicacion loc ON a.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN Rol r ON u.id_rol = r.id_rol
+            LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
             WHERE (u.username = ? OR u.email = ?) 
             AND u.activo = 1 
             AND e.estado = 1
@@ -62,12 +62,17 @@ class UsuarioModel {
      */
     static async hasPermission(idUsuario, accion) {
         // Implementación básica de permisos por rol del sistema
-        const sql = `SELECT rol_sistema FROM Usuario WHERE id_usuario = ? AND activo = 1`;
+        const sql = `
+            SELECT r.nombre_rol 
+            FROM Usuario u 
+            INNER JOIN Rol r ON u.id_rol = r.id_rol 
+            WHERE u.id_usuario = ? AND u.activo = 1
+        `;
         const result = await query(sql, [idUsuario]);
         
         if (!result[0]) return false;
         
-        const rol = result[0].rol_sistema;
+        const rol = result[0].nombre_rol;
         
         // Definir permisos básicos por rol
         const permisos = {
@@ -93,7 +98,7 @@ class UsuarioModel {
                 u.id_usuario,
                 u.username,
                 u.email as email_usuario,
-                u.rol_sistema,
+                u.id_rol,
                 u.activo as usuario_activo,
                 u.ultimo_acceso,
                 u.fecha_creacion as fecha_creacion_usuario,
@@ -113,8 +118,8 @@ class UsuarioModel {
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
-            LEFT JOIN Ubicacion loc ON a.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN Rol r ON u.id_rol = r.id_rol
+            LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
             LEFT JOIN Usuario creador ON u.creado_por = creador.id_usuario
             LEFT JOIN Usuario actualizador ON u.actualizado_por = actualizador.id_usuario
             ORDER BY u.fecha_creacion DESC
@@ -133,7 +138,7 @@ class UsuarioModel {
                 u.id_usuario,
                 u.username,
                 u.email as email_usuario,
-                u.rol_sistema,
+                u.id_rol,
                 u.activo as usuario_activo,
                 u.ultimo_acceso,
                 u.fecha_creacion as fecha_creacion_usuario,
@@ -153,8 +158,8 @@ class UsuarioModel {
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
-            LEFT JOIN Ubicacion loc ON a.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN Rol r ON u.id_rol = r.id_rol
+            LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
             LEFT JOIN Usuario creador ON u.creado_por = creador.id_usuario
             LEFT JOIN Usuario actualizador ON u.actualizado_por = actualizador.id_usuario
             WHERE u.id_usuario = ?
@@ -170,7 +175,7 @@ class UsuarioModel {
      * @returns {Object} Resultado de la operación
      */
     static async create(userData, creadoPor) {
-        const { id_empleado, username, email, password, rol_sistema } = userData;
+        const { id_empleado, username, email, password, id_rol } = userData;
         
         try {
             // Hash de la contraseña
@@ -205,7 +210,7 @@ class UsuarioModel {
                     username, 
                     email, 
                     password, 
-                    rol_sistema, 
+                    id_rol, 
                     activo, 
                     creado_por, 
                     fecha_creacion, 
@@ -218,7 +223,7 @@ class UsuarioModel {
                 username, 
                 email, 
                 hashedPassword, 
-                rol_sistema, 
+                id_rol, 
                 creadoPor
             ]);
             
@@ -240,7 +245,7 @@ class UsuarioModel {
      * @returns {Object}
      */
     static async update(id, updateData) {
-        const allowedFields = ['username', 'email', 'rol_sistema', 'activo'];
+        const allowedFields = ['username', 'email', 'id_rol', 'activo'];
         const fields = [];
         const values = [];
 
@@ -328,7 +333,7 @@ class UsuarioModel {
                 u.id_usuario,
                 u.username,
                 u.email as email_usuario,
-                u.rol_sistema,
+                u.id_rol,
                 u.activo as usuario_activo,
                 u.ultimo_acceso,
                 u.fecha_creacion as fecha_creacion_usuario,
@@ -345,8 +350,8 @@ class UsuarioModel {
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
-            LEFT JOIN Ubicacion loc ON a.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN Rol r ON u.id_rol = r.id_rol
+            LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
             WHERE u.id_empleado = ?
         `;
         const result = await query(sql, [idEmpleado]);
@@ -364,7 +369,7 @@ class UsuarioModel {
                 u.id_usuario,
                 u.username,
                 u.email as email_usuario,
-                u.rol_sistema,
+                u.id_rol,
                 u.activo as usuario_activo,
                 u.ultimo_acceso,
                 e.id_empleado,
@@ -380,9 +385,9 @@ class UsuarioModel {
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Rol r ON e.id_rol = r.id_rol
-            LEFT JOIN Ubicacion loc ON a.id_ubicacion = loc.id_ubicacion
-            WHERE u.rol_sistema = ? AND u.activo = 1
+            LEFT JOIN Rol r ON u.id_rol = r.id_rol
+            LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
+            WHERE r.nombre_rol = ? AND u.activo = 1
             ORDER BY e.apellido, e.nombre
         `;
         return await query(sql, [rol]);
@@ -400,7 +405,7 @@ class UsuarioModel {
                 u.username,
                 CONCAT(e.nombre, ' ', e.apellido) as nombre_completo,
                 u.email as email_usuario,
-                u.rol_sistema,
+                u.id_rol,
                 u.activo as usuario_activo
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
@@ -451,12 +456,13 @@ class UsuarioModel {
         const sql = `
             SELECT 
                 COUNT(*) as total_usuarios,
-                SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) as usuarios_activos,
-                SUM(CASE WHEN rol_sistema = 'administrador' THEN 1 ELSE 0 END) as administradores,
-                SUM(CASE WHEN rol_sistema = 'recursos_humanos' THEN 1 ELSE 0 END) as recursos_humanos,
-                SUM(CASE WHEN rol_sistema = 'almacen' THEN 1 ELSE 0 END) as almacen,
-                SUM(CASE WHEN ultimo_acceso >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as activos_ultimo_mes
-            FROM Usuario
+                SUM(CASE WHEN u.activo = 1 THEN 1 ELSE 0 END) as usuarios_activos,
+                SUM(CASE WHEN r.nombre_rol = 'administrador' THEN 1 ELSE 0 END) as administradores,
+                SUM(CASE WHEN r.nombre_rol = 'recursos_humanos' THEN 1 ELSE 0 END) as recursos_humanos,
+                SUM(CASE WHEN r.nombre_rol = 'almacen' THEN 1 ELSE 0 END) as almacen,
+                SUM(CASE WHEN u.ultimo_acceso >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as activos_ultimo_mes
+            FROM Usuario u
+            LEFT JOIN Rol r ON u.id_rol = r.id_rol
         `;
         const result = await query(sql);
         return result[0];
@@ -495,8 +501,8 @@ class UsuarioModel {
         }
 
         // Validar rol
-        const rolesValidos = ['administrador', 'recursos_humanos', 'almacen'];
-        if (!userData.rol_sistema || !rolesValidos.includes(userData.rol_sistema)) {
+        const rolesValidos = [1, 2, 3]; // IDs de roles válidos
+        if (!userData.id_rol || !rolesValidos.includes(userData.id_rol)) {
             errors.push('Rol del sistema no es válido');
         }
 
@@ -511,6 +517,215 @@ class UsuarioModel {
             valid: errors.length === 0,
             errors
         };
+    }
+
+    // ===========================================
+    // MÉTODOS DE RESTABLECIMIENTO DE CONTRASEÑA
+    // ===========================================
+
+    /**
+     * Guardar token de restablecimiento de contraseña
+     * @param {number} idUsuario 
+     * @param {string} hashedToken - Token ya hasheado
+     * @param {Date} expiration - Fecha de expiración
+     * @returns {boolean}
+     */
+    static async saveResetToken(idUsuario, hashedToken, expiration) {
+        try {
+            const sql = `
+                UPDATE Usuario 
+                SET reset_token = ?, 
+                    reset_token_expiration = ?, 
+                    fecha_actualizacion = NOW() 
+                WHERE id_usuario = ?
+            `;
+            const result = await query(sql, [hashedToken, expiration, idUsuario]);
+            return result.affectedRows > 0;
+        } catch (error) {
+            console.error('Error guardando reset token:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Buscar usuario por token de restablecimiento válido
+     * @param {string} hashedToken - Token hasheado
+     * @returns {Object|null}
+     */
+    static async findByResetToken(hashedToken) {
+        try {
+            const sql = `
+                SELECT 
+                    u.id_usuario,
+                    u.username,
+                    u.email as email_usuario,
+                    u.reset_token,
+                    u.reset_token_expiration,
+                    u.activo as usuario_activo,
+                    e.id_empleado,
+                    e.nombre,
+                    e.apellido,
+                    e.estado as empleado_activo
+                FROM Usuario u
+                INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
+                WHERE u.reset_token = ? 
+                AND u.reset_token_expiration > NOW() 
+                AND u.activo = 1 
+                AND e.estado = 1
+            `;
+            const result = await query(sql, [hashedToken]);
+            return result[0] || null;
+        } catch (error) {
+            console.error('Error buscando por reset token:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Restablecer contraseña con token y limpiar token
+     * @param {number} idUsuario 
+     * @param {string} newPassword - Nueva contraseña sin hashear
+     * @returns {boolean}
+     */
+    static async resetPasswordWithToken(idUsuario, newPassword) {
+        try {
+            // Hash de la nueva contraseña
+            const hashedPassword = await bcrypt.hash(newPassword, 12);
+            
+            // Actualizar contraseña y limpiar token
+            const sql = `
+                UPDATE Usuario 
+                SET password = ?, 
+                    reset_token = NULL, 
+                    reset_token_expiration = NULL, 
+                    fecha_actualizacion = NOW() 
+                WHERE id_usuario = ?
+            `;
+            const result = await query(sql, [hashedPassword, idUsuario]);
+            return result.affectedRows > 0;
+        } catch (error) {
+            console.error('Error reseteando password con token:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Limpiar tokens de restablecimiento expirados
+     * @returns {number} - Cantidad de tokens limpiados
+     */
+    static async cleanExpiredResetTokens() {
+        try {
+            const sql = `
+                UPDATE Usuario 
+                SET reset_token = NULL, 
+                    reset_token_expiration = NULL, 
+                    fecha_actualizacion = NOW() 
+                WHERE reset_token_expiration < NOW()
+            `;
+            const result = await query(sql);
+            return result.affectedRows;
+        } catch (error) {
+            console.error('Error limpiando tokens expirados:', error);
+            return 0;
+        }
+    }
+
+    // ===========================================
+    // MÉTODOS DE AUDITORÍA
+    // ===========================================
+
+    /**
+     * Registrar solicitud de restablecimiento de contraseña
+     * @param {number} idUsuario 
+     * @param {string} ip 
+     */
+    static async logPasswordResetRequest(idUsuario, ip) {
+        try {
+            // Verificar si existe la tabla HistorialMovimientos
+            const checkTableSql = `
+                SELECT COUNT(*) as exists_table 
+                FROM information_schema.tables 
+                WHERE table_schema = DATABASE() 
+                AND table_name = 'HistorialMovimientos'
+            `;
+            const tableExists = await query(checkTableSql);
+            
+            if (tableExists[0].exists_table > 0) {
+                const sql = `
+                    INSERT INTO HistorialMovimientos (
+                        tabla_afectada, 
+                        operacion, 
+                        id_registro_afectado, 
+                        valores_anteriores, 
+                        valores_nuevos, 
+                        realizada_por, 
+                        fecha_movimiento,
+                        ip_address
+                    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
+                `;
+                await query(sql, [
+                    'Usuario',
+                    'RESET_PASSWORD_REQUEST',
+                    idUsuario,
+                    JSON.stringify({ action: 'password_reset_requested' }),
+                    JSON.stringify({ timestamp: new Date().toISOString(), ip }),
+                    idUsuario,
+                    ip
+                ]);
+            }
+        } catch (error) {
+            console.error('Error registrando solicitud de reset:', error);
+            // No fallar la operación principal por error de auditoría
+        }
+    }
+
+    /**
+     * Registrar restablecimiento de contraseña exitoso
+     * @param {number} idUsuario 
+     * @param {string} ip 
+     */
+    static async logPasswordReset(idUsuario, ip) {
+        try {
+            // Verificar si existe la tabla HistorialMovimientos
+            const checkTableSql = `
+                SELECT COUNT(*) as exists_table 
+                FROM information_schema.tables 
+                WHERE table_schema = DATABASE() 
+                AND table_name = 'HistorialMovimientos'
+            `;
+            const tableExists = await query(checkTableSql);
+            
+            if (tableExists[0].exists_table > 0) {
+                const sql = `
+                    INSERT INTO HistorialMovimientos (
+                        tabla_afectada, 
+                        operacion, 
+                        id_registro_afectado, 
+                        valores_anteriores, 
+                        valores_nuevos, 
+                        realizada_por, 
+                        fecha_movimiento,
+                        ip_address
+                    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
+                `;
+                await query(sql, [
+                    'Usuario',
+                    'PASSWORD_RESET_COMPLETED',
+                    idUsuario,
+                    JSON.stringify({ action: 'password_reset_completed' }),
+                    JSON.stringify({ 
+                        timestamp: new Date().toISOString(), 
+                        ip,
+                        method: 'reset_token'
+                    }),
+                    idUsuario,
+                    ip
+                ]);
+            }
+        } catch (error) {
+            console.error('Error registrando reset completado:', error);
+            // No fallar la operación principal por error de auditoría
+        }
     }
 }
 

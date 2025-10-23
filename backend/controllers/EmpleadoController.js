@@ -52,26 +52,43 @@ class EmpleadoController {
     static async create(req, res) {
         try {
             const {
-                nombre, apellido, email, telefono, cargo,
-                id_genero, id_area, id_rol, estado = 1
+                Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
+                email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
+                fecha_fin, estado = 1
             } = req.body;
 
             // Validaciones básicas
-            if (!nombre || !apellido || !id_genero || !id_area || !id_rol) {
+            if (!Identificacion || !tipo_identificacion || !nombre || !apellido || !fecha_inicio || !cargo || !id_genero || !id_area) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Nombre, apellido, género, área y rol son requeridos'
+                    message: 'Identificación, tipo de identificación, nombre, apellido, fecha de inicio, cargo, género y área son requeridos'
+                });
+            }
+
+            // Validar identificación única
+            const existeId = await EmpleadoModel.existeIdentificacion(Identificacion);
+            if (existeId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ya existe un empleado con esta identificación'
                 });
             }
 
             // Validar email único si se proporciona
             if (email) {
-                // Aquí podrías agregar validación de email único
+                const existeEmail = await EmpleadoModel.existeEmail(email);
+                if (existeEmail) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Ya existe un empleado con este email'
+                    });
+                }
             }
 
             const insertId = await EmpleadoModel.create({
-                nombre, apellido, email, telefono, cargo,
-                id_genero, id_area, id_rol, estado
+                Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
+                email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
+                fecha_fin, estado
             });
             
             res.status(201).json({
@@ -86,7 +103,7 @@ class EmpleadoController {
             if (error.code === 'ER_NO_REFERENCED_ROW_2') {
                 return res.status(400).json({
                     success: false,
-                    message: 'Género, área o rol especificado no existe'
+                    message: 'Género o área especificado no existe'
                 });
             }
 
@@ -111,17 +128,21 @@ class EmpleadoController {
             });
             
             const {
-                nombre, apellido, email, telefono, cargo,
-                id_genero, id_area, id_rol, estado
+                Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
+                email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
+                fecha_fin, estado
             } = req.body;
 
             // Validaciones básicas para campos obligatorios
             const camposFaltantes = [];
+            if (!Identificacion || Identificacion.trim() === '') camposFaltantes.push('identificación');
+            if (!tipo_identificacion) camposFaltantes.push('tipo de identificación');
             if (!nombre || nombre.trim() === '') camposFaltantes.push('nombre');
             if (!apellido || apellido.trim() === '') camposFaltantes.push('apellido');
+            if (!fecha_inicio) camposFaltantes.push('fecha de inicio');
+            if (!cargo || cargo.trim() === '') camposFaltantes.push('cargo');
             if (!id_genero) camposFaltantes.push('género');
             if (!id_area) camposFaltantes.push('área');
-            if (!id_rol) camposFaltantes.push('rol');
             
             if (camposFaltantes.length > 0) {
                 return res.status(400).json({
@@ -130,9 +151,30 @@ class EmpleadoController {
                 });
             }
 
+            // Validar identificación única (excluyendo el empleado actual)
+            const existeId = await EmpleadoModel.existeIdentificacion(Identificacion, id);
+            if (existeId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ya existe otro empleado con esta identificación'
+                });
+            }
+
+            // Validar email único si se proporciona (excluyendo el empleado actual)
+            if (email) {
+                const existeEmail = await EmpleadoModel.existeEmail(email, id);
+                if (existeEmail) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Ya existe otro empleado con este email'
+                    });
+                }
+            }
+
             const updated = await EmpleadoModel.update(id, {
-                nombre, apellido, email, telefono, cargo,
-                id_genero, id_area, id_rol, estado
+                Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
+                email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
+                fecha_fin, estado
             });
             
             if (!updated) {
@@ -152,7 +194,7 @@ class EmpleadoController {
             if (error.code === 'ER_NO_REFERENCED_ROW_2') {
                 return res.status(400).json({
                     success: false,
-                    message: 'Género, área o rol especificado no existe'
+                    message: 'Género o área especificado no existe'
                 });
             }
 
@@ -245,6 +287,26 @@ class EmpleadoController {
             res.status(500).json({
                 success: false,
                 message: 'Error al buscar empleados',
+                error: error.message
+            });
+        }
+    }
+
+    // Obtener empleados sin usuario asignado
+    static async getEmpleadosSinUsuario(req, res) {
+        try {
+            const empleados = await EmpleadoModel.getEmpleadosSinUsuario();
+            
+            res.json({
+                success: true,
+                data: empleados,
+                message: 'Empleados sin usuario obtenidos correctamente'
+            });
+        } catch (error) {
+            console.error('Error al obtener empleados sin usuario:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error al obtener empleados sin usuario',
                 error: error.message
             });
         }

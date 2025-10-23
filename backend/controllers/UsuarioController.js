@@ -9,9 +9,8 @@ class UsuarioController {
      */
     static async getAll(req, res) {
         try {
-            // Verificar permisos
-            const puedeGestionar = ['administrador', 'recursos_humanos'].includes(req.user.rol_sistema);
-            if (!puedeGestionar) {
+            // Verificar permisos - Solo Administrador (id_rol = 4) puede ver usuarios
+            if (req.user.id_rol !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'No tienes permisos para ver la lista de usuarios'
@@ -43,13 +42,12 @@ class UsuarioController {
         try {
             const { id } = req.params;
             const idUsuarioSolicitante = req.user.id_usuario;
-            const rolSolicitante = req.user.rol_sistema;
 
             // Los usuarios pueden ver su propia información
-            // Admins y RH pueden ver cualquier usuario
+            // Solo Administrador (id_rol = 4) puede ver cualquier usuario
             const puedeVer = (
                 parseInt(id) === idUsuarioSolicitante || 
-                ['administrador', 'recursos_humanos'].includes(rolSolicitante)
+                req.user.id_rol === 4
             );
 
             if (!puedeVer) {
@@ -90,15 +88,15 @@ class UsuarioController {
      */
     static async create(req, res) {
         try {
-            // Solo administradores pueden crear usuarios
-            if (req.user.rol_sistema !== 'administrador') {
+            // Solo Administrador (id_rol = 4) puede crear usuarios
+            if (req.user.id_rol !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden crear usuarios'
                 });
             }
 
-            const { id_empleado, username, email, password, rol_sistema } = req.body;
+            const { id_empleado, username, email, password, id_rol } = req.body;
             
             // Validar datos de entrada
             const validation = UsuarioModel.validateUserData(req.body);
@@ -132,7 +130,7 @@ class UsuarioController {
                 username,
                 email,
                 password,
-                rol_sistema
+                id_rol
             }, req.user.id_usuario);
 
             // No devolver la contraseña en la respuesta
@@ -172,11 +170,10 @@ class UsuarioController {
         try {
             const { id } = req.params;
             const idUsuarioSolicitante = req.user.id_usuario;
-            const rolSolicitante = req.user.rol_sistema;
 
             // Verificar permisos
             const esPropio = parseInt(id) === idUsuarioSolicitante;
-            const esAdmin = rolSolicitante === 'administrador';
+            const esAdmin = req.user.id_rol === 4; // Solo Administrador (id_rol = 4)
 
             if (!esPropio && !esAdmin) {
                 return res.status(403).json({
@@ -190,7 +187,7 @@ class UsuarioController {
             if (esPropio && !esAdmin) {
                 camposPermitidos = ['email']; // Los usuarios solo pueden cambiar su email
             } else if (esAdmin) {
-                camposPermitidos = ['username', 'email', 'rol_sistema', 'activo']; // Admins pueden cambiar todo
+                camposPermitidos = ['username', 'email', 'id_rol', 'activo']; // Admins pueden cambiar todo
             }
 
             const updateData = {};
@@ -250,8 +247,8 @@ class UsuarioController {
         try {
             const { id } = req.params;
 
-            // Solo administradores pueden desactivar usuarios
-            if (req.user.rol_sistema !== 'administrador') {
+            // Solo Administrador (id_rol = 4) puede desactivar usuarios
+            if (req.user.id_rol !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden desactivar usuarios'
@@ -298,8 +295,8 @@ class UsuarioController {
         try {
             const { id } = req.params;
 
-            // Solo administradores pueden activar usuarios
-            if (req.user.rol_sistema !== 'administrador') {
+            // Solo Administrador (id_rol = 4) puede activar usuarios
+            if (req.user.id_rol !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden activar usuarios'
@@ -339,8 +336,8 @@ class UsuarioController {
             const { id } = req.params;
             const { newPassword } = req.body;
 
-            // Solo administradores pueden resetear contraseñas
-            if (req.user.rol_sistema !== 'administrador') {
+            // Solo Administrador (id_rol = 4) puede resetear contraseñas
+            if (req.user.id_rol !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden resetear contraseñas'

@@ -1,5 +1,22 @@
-/* Fuentes de Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
+/* Fuentes de Google Fonts: Inter para cuerpo y Rubik para encabezados */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rubik:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700&display=swap');
+
+/* BorisBlackBloxx is a display/brand font not available on Google Fonts.
+   To use it, add the font files to `frontend/public/fonts/` (prefer .woff2 + .woff)
+   and uncomment/edit the src paths below accordingly. Example file names:
+     public/fonts/BorisBlackBloxx-Regular.woff2
+     public/fonts/BorisBlackBloxx-Regular.woff
+*/
+
+@font-face {
+  font-family: 'BorisBlackBloxx';
+  src: url('/fonts/BorisBlackBloxx-Regular.woff2') format('woff2'),
+       url('/fonts/BorisBlackBloxx-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 
 /* Importar Tailwind CSS */
 @tailwind base;
@@ -10,6 +27,100 @@
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    @apply bg-gray-50;
+    /* Use the pale gold (primary-50) as global background so sections blend */
+    @apply bg-primary-50;
+  /* Variables para tipografía */
+  --font-heading: 'Rubik', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Encabezados: usar Playfair Display para mayor elegancia y presencia */
+  h1, .h1 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    line-height: 1.05;
+  }
+
+  h2, .h2 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    line-height: 1.08;
+  }
+
+  h3, .h3 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    line-height: 1.12;
+  }
+
+  p, span, a, li {
+    font-family: var(--font-body);
+  }
+
+  /* Tamaños responsivos recomendados para hero y títulos */
+  .hero-title {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Ajustes específicos por breakpoint */
+  @screen sm {
+    .hero-title { font-size: 2.25rem; } /* 36px */
+  }
+
+  @screen md {
+    .hero-title { font-size: 3rem; } /* 48px */
+  }
+
+  @screen lg {
+    .hero-title { font-size: 3.75rem; } /* 60px */
+  }
+
+  @screen xl {
+    .hero-title { font-size: 4.5rem; } /* 72px */
   }
 }
+
+/* When .no-containers is present on body, make any element using the
+   Tailwind `bg-white` utility render transparent so sections blend
+   with the global pale-gold background. This preserves borders and text.
+   Use carefully (modals may also lose background if present). */
+/* Keep white backgrounds for elements explicitly marked as always-white
+   (e.g., primary CTAs or modals). All other bg-white elements become
+   transparent when the landing 'no-containers' mode is active. */
+body.no-containers .bg-white:not(.always-white) {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Elements explicitly opting in to remain white */
+body.no-containers .always-white {
+  background-color: #ffffff !important;
+}
+
+/* Boxicons icons styling - Simple and direct approach */
+.bx, .bxl {
+  font-family: 'boxicons' !important;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  display: inline-block;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[class^="bx-"], [class*=" bx-"], [class^="bxl-"], [class*=" bxl-"] {
+  font-family: 'boxicons' !important;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  display: inline-block;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+

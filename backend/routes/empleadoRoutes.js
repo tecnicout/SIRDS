@@ -9,6 +9,7 @@ router.use(authMiddleware);
 // Rutas para empleados
 router.get('/', EmpleadoController.getAll);
 router.get('/search', EmpleadoController.search);
+router.get('/sin-usuario', EmpleadoController.getEmpleadosSinUsuario);
 router.get('/area/:idArea', EmpleadoController.getByArea);
 router.get('/:id', EmpleadoController.getById);
 router.post('/', EmpleadoController.create);

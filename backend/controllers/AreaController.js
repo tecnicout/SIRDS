@@ -51,7 +51,7 @@ class AreaController {
     // Crear nueva área
     static async create(req, res) {
         try {
-            const { nombre_area, id_ubicacion } = req.body;
+            const { nombre_area } = req.body;
 
             // Validaciones básicas
             if (!nombre_area || !nombre_area.trim()) {
@@ -61,34 +61,17 @@ class AreaController {
                 });
             }
 
-            if (!id_ubicacion) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'La ubicación es requerida'
-                });
-            }
-
-            // Verificar que la ubicación existe
-            const ubicacionExiste = await AreaModel.ubicacionExists(id_ubicacion);
-            if (!ubicacionExiste) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'La ubicación seleccionada no existe'
-                });
-            }
-
-            // Verificar que no existe un área con el mismo nombre en la misma ubicación
-            const areaExistente = await AreaModel.existsByNameAndUbicacion(nombre_area.trim(), id_ubicacion);
+            // Verificar que no existe un área con el mismo nombre
+            const areaExistente = await AreaModel.existsByName(nombre_area.trim());
             if (areaExistente) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Ya existe un área con ese nombre en la ubicación seleccionada'
+                    message: 'Ya existe un área con ese nombre'
                 });
             }
 
             const insertId = await AreaModel.create({ 
-                nombre_area: nombre_area.trim(), 
-                id_ubicacion 
+                nombre_area: nombre_area.trim()
             });
             
             res.status(201).json({
@@ -110,20 +93,13 @@ class AreaController {
     static async update(req, res) {
         try {
             const { id } = req.params;
-            const { nombre_area, id_ubicacion } = req.body;
+            const { nombre_area } = req.body;
 
             // Validaciones básicas
             if (!nombre_area || !nombre_area.trim()) {
                 return res.status(400).json({
                     success: false,
                     message: 'El nombre del área es requerido'
-                });
-            }
-
-            if (!id_ubicacion) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'La ubicación es requerida'
                 });
             }
 
@@ -136,27 +112,17 @@ class AreaController {
                 });
             }
 
-            // Verificar que la ubicación existe
-            const ubicacionExiste = await AreaModel.ubicacionExists(id_ubicacion);
-            if (!ubicacionExiste) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'La ubicación seleccionada no existe'
-                });
-            }
-
-            // Verificar que no existe un área con el mismo nombre en la misma ubicación (excluyendo la actual)
-            const areaExistente = await AreaModel.existsByNameAndUbicacion(nombre_area.trim(), id_ubicacion, id);
+            // Verificar que no existe un área con el mismo nombre (excluyendo la actual)
+            const areaExistente = await AreaModel.existsByName(nombre_area.trim(), id);
             if (areaExistente) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Ya existe un área con ese nombre en la ubicación seleccionada'
+                    message: 'Ya existe un área con ese nombre'
                 });
             }
 
             const updated = await AreaModel.update(id, { 
-                nombre_area: nombre_area.trim(), 
-                id_ubicacion 
+                nombre_area: nombre_area.trim()
             });
             
             if (!updated) {
@@ -221,27 +187,6 @@ class AreaController {
             res.status(500).json({
                 success: false,
                 message: 'Error al inactivar el área',
-                error: error.message
-            });
-        }
-    }
-
-    // Obtener áreas por ubicación
-    static async getByUbicacion(req, res) {
-        try {
-            const { id_ubicacion } = req.params;
-            const areas = await AreaModel.getByUbicacion(id_ubicacion);
-            
-            res.json({
-                success: true,
-                data: areas,
-                message: 'Áreas obtenidas correctamente'
-            });
-        } catch (error) {
-            console.error('Error al obtener áreas por ubicación:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error al obtener áreas por ubicación',
                 error: error.message
             });
         }
