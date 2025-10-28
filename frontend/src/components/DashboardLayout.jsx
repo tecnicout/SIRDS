@@ -3,22 +3,29 @@ import Sidebar from './Sidebar';
 import NavPrivada from './NavPrivada';
 
 export default function DashboardLayout({ children, onLogout }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Iniciar cerrado
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
+  const handleSidebarMouseEnter = () => {
+    setSidebarCollapsed(false);
+  };
+
+  const handleSidebarMouseLeave = () => {
+    setSidebarCollapsed(true);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <NavPrivada onLogout={onLogout} />
-      <div className="flex flex-1">
+      <div className="pt-24 flex">
         <Sidebar 
           collapsed={sidebarCollapsed}
-          onToggle={toggleSidebar}
+          onMouseEnter={handleSidebarMouseEnter}
+          onMouseLeave={handleSidebarMouseLeave}
           onLogout={onLogout}
         />
-        <main className="flex-1 p-6">
+        <main className={`flex-1 p-6 transition-all duration-500 ease-in-out ${
+          sidebarCollapsed ? 'ml-16' : 'ml-64'
+        }`}>
           {children}
         </main>
       </div>

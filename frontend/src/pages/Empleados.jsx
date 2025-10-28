@@ -8,19 +8,20 @@ const EMPLEADOS_COLUMNS = [
     key: 'empleado_info',
     label: 'Empleado',
     sortable: true,
+    width: '20%',
     render: (value, row) => (
       <div className="flex items-center">
-        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-          <span className="text-green-600 font-medium text-sm">
+        <div className="w-12 h-12 bg-gray-400 rounded-full flex items-center justify-center shadow-md border-2 border-gray-300">
+          <span className="text-white font-bold text-sm">
             {(row.nombre?.charAt(0) || '') + (row.apellido?.charAt(0) || '')}
           </span>
         </div>
         <div className="ml-4">
-          <div className="text-sm font-medium text-gray-900">
+          <div className="text-sm font-semibold text-gray-700">
             {row.nombre} {row.apellido}
           </div>
-          <div className="text-sm text-gray-500">
-            ID: {row.Identificacion} | {row.id_empleado}
+          <div className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md inline-block border">
+            ID: <span className="font-mono text-gray-800">{row.Identificacion}</span>
           </div>
         </div>
       </div>
@@ -29,10 +30,21 @@ const EMPLEADOS_COLUMNS = [
   {
     key: 'contacto_info',
     label: 'Contacto',
+    width: '18%',
     render: (value, row) => (
-      <div>
-        <div className="text-sm text-gray-900">{row.email || 'Sin email'}</div>
-        <div className="text-sm text-gray-500">{row.telefono || 'Sin teléfono'}</div>
+      <div className="space-y-1">
+        <div className="text-sm text-gray-700 flex items-center">
+          <div className="w-4 h-4 bg-gray-400 rounded flex items-center justify-center mr-2">
+            <i className="bx bx-envelope text-xs text-white"></i>
+          </div>
+          <span className="truncate">{row.email || 'Sin email'}</span>
+        </div>
+        <div className="text-sm text-gray-600 flex items-center">
+          <div className="w-4 h-4 bg-gray-400 rounded flex items-center justify-center mr-2">
+            <i className="bx bx-phone text-xs text-white"></i>
+          </div>
+          {row.telefono || 'Sin teléfono'}
+        </div>
       </div>
     )
   },
@@ -40,10 +52,18 @@ const EMPLEADOS_COLUMNS = [
     key: 'trabajo_info',
     label: 'Trabajo',
     sortable: true,
+    width: '16%',
     render: (value, row) => (
-      <div>
-        <div className="text-sm font-medium text-gray-900">{row.cargo}</div>
-        <div className="text-sm text-gray-500">{row.nombre_area || 'Sin área'}</div>
+      <div className="space-y-1">
+        <div className="text-sm font-semibold text-gray-700 flex items-center">
+          <div className="w-5 h-5 bg-gradient-to-r from-[#B39237] to-[#D4AF37] rounded flex items-center justify-center mr-2">
+            <i className="bx bx-briefcase text-xs text-white"></i>
+          </div>
+          {row.cargo}
+        </div>
+        <div className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md inline-block border">
+          {row.nombre_area || 'Sin área asignada'}
+        </div>
       </div>
     )
   },
@@ -51,26 +71,38 @@ const EMPLEADOS_COLUMNS = [
     key: 'estado',
     label: 'Estado',
     align: 'center',
+    width: '22%',
     render: (value, row) => (
-      <div className="flex flex-col space-y-1">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+      <div className="flex items-center justify-center space-x-2 w-full">
+        {/* Badge de estado - tamaño optimizado */}
+        <div className={`inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm transition-all duration-200 min-w-[75px] h-[32px] ${
           row.estado 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
+            ? 'bg-gradient-to-r from-[#B39237] to-[#D4AF37] text-white hover:shadow-md' 
+            : 'bg-gray-500 text-white'
         }`}>
-          {row.estado ? 'Activo' : 'Inactivo'}
-        </span>
-        {row.sueldo && (
-          <span className="text-xs text-gray-500">
-            ${parseFloat(row.sueldo).toLocaleString()}
-          </span>
-        )}
+          <i className={`bx ${row.estado ? 'bx-check-circle' : 'bx-x-circle'} text-sm mr-1`}></i>
+          <span>{row.estado ? 'Activo' : 'Inactivo'}</span>
+        </div>
+        
+        {/* Separador visual más delgado */}
+        <div className="h-6 w-px bg-gray-300"></div>
+        
+        {/* Información salarial - tamaño optimizado */}
+        <div className={`bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-100 transition-colors duration-200 min-w-[110px] h-[32px] flex flex-col justify-center ${
+          !row.sueldo ? 'opacity-60' : ''
+        }`}>
+          <div className="text-xs text-gray-600 font-medium leading-none">Sueldo</div>
+          <div className="text-xs font-bold text-gray-800 font-mono leading-none mt-0.5">
+            {row.sueldo ? `$${parseFloat(row.sueldo).toLocaleString()}` : 'No definido'}
+          </div>
+        </div>
       </div>
     )
   },
   {
     key: 'fechas_info',
     label: 'Fechas',
+    width: '14%',
     render: (value, row) => (
       <div>
         <div className="text-sm text-gray-900">
@@ -149,6 +181,10 @@ export default function Empleados() {
   // Estados para búsqueda y filtros
   const [searchQuery, setSearchQuery] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('');
+
+  // Estados para paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Toast notification system
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -324,6 +360,17 @@ export default function Empleados() {
       return matchesSearch && matchesEstado;
     });
   }, [empleados, searchQuery, estadoFiltro]);
+
+  // Lógica de paginación
+  const totalPages = Math.ceil(empleadosFiltrados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const empleadosPaginados = empleadosFiltrados.slice(startIndex, endIndex);
+
+  // Resetear página al cambiar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, estadoFiltro]);
 
   // Función para crear empleado con validaciones mejoradas
   const crearEmpleado = useCallback(async (empleadoData) => {
@@ -598,34 +645,28 @@ export default function Empleados() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 max-w-full overflow-hidden">
       {/* Toast Notification Mejorado */}
       {toast.show && (
         <div 
-          className={`fixed top-4 right-4 z-[9999] p-4 rounded-lg shadow-2xl transition-all duration-300 transform ${
+          className={`fixed top-4 right-4 left-4 sm:left-auto z-[9999] p-4 rounded-lg shadow-2xl transition-all duration-300 transform ${
             toast.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
             toast.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
             toast.type === 'warning' ? 'bg-yellow-50 text-yellow-800 border border-yellow-200' :
             'bg-blue-50 text-blue-800 border border-blue-200'
-          } max-w-md`}
+          } max-w-md sm:max-w-sm md:max-w-md`}
           style={{ filter: 'none', backdropFilter: 'none' }}
         >
           <div className="flex items-start">
             <div className="flex-shrink-0">
               {toast.type === 'success' && (
-                <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <i className="bx bx-check-circle text-xl text-green-400"></i>
               )}
               {toast.type === 'error' && (
-                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <i className="bx bx-error-circle text-xl text-red-400"></i>
               )}
               {toast.type === 'warning' && (
-                <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
+                <i className="bx bx-error text-xl text-yellow-400"></i>
               )}
             </div>
             <div className="ml-3 flex-1">
@@ -641,9 +682,7 @@ export default function Empleados() {
                 }`}
                 onClick={() => setToast({ show: false, message: '', type: 'success' })}
               >
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+                <i className="bx bx-x text-xl"></i>
               </button>
             </div>
           </div>
@@ -651,68 +690,62 @@ export default function Empleados() {
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Empleados</h1>
-          <p className="text-gray-600">Administra la información de los empleados de Arroz Sonora</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-700">Gestión de Empleados</h1>
+          <p className="text-sm md:text-base text-gray-600">Administra la información de los empleados de Arroz Sonora</p>
         </div>
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow border">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+        <div className="bg-white p-4 md:p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Empleados</p>
-              <p className="text-2xl font-bold text-gray-900">{empleados.length}</p>
+            <div className="flex-1">
+              <p className="text-xs md:text-sm font-medium text-gray-600">Total Empleados</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-600">{empleados.length}</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-              </svg>
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i className="bx bx-group text-xl md:text-2xl text-gray-600"></i>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="bg-white p-4 md:p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Empleados Activos</p>
-              <p className="text-2xl font-bold text-green-600">
+            <div className="flex-1">
+              <p className="text-xs md:text-sm font-medium text-gray-600">Empleados Activos</p>
+              <p className="text-xl md:text-2xl font-bold text-[#B39237]">
                 {empleados.filter(emp => emp.estado).length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-[#B39237] to-[#D4AF37] rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+              <i className="bx bx-check-circle text-xl md:text-2xl text-white"></i>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="bg-white p-4 md:p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Empleados Inactivos</p>
-              <p className="text-2xl font-bold text-red-600">
+            <div className="flex-1">
+              <p className="text-xs md:text-sm font-medium text-gray-600">Empleados Inactivos</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-600">
                 {empleados.filter(emp => !emp.estado).length}
               </p>
             </div>
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-400 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+              <i className="bx bx-x-circle text-xl md:text-2xl text-white"></i>
             </div>
           </div>
         </div>
       </div>
 
       {/* Filtros simplificados */}
-      <div className="bg-white p-6 rounded-lg shadow border">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+      <div className="bg-white p-4 md:p-6 rounded-lg shadow border">
+        <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-3 md:gap-4 md:items-end">
           {/* Búsqueda principal */}
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
               Buscar empleado
             </label>
             <div className="relative">
@@ -720,22 +753,18 @@ export default function Empleados() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ID, nombre, apellido, email, cargo, área, género..."
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="ID, nombre, apellido, email, cargo..."
+                className="w-full pl-10 pr-3 py-2 md:py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#B39237] focus:border-[#B39237]"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <i className="bx bx-search text-xl text-gray-400"></i>
               </div>
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
-                  <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <i className="bx bx-x text-xl text-gray-400 hover:text-gray-600"></i>
                 </button>
               )}
             </div>
@@ -743,11 +772,11 @@ export default function Empleados() {
 
           {/* Filtro por estado */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+            <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">Estado</label>
             <select
               value={estadoFiltro}
               onChange={(e) => setEstadoFiltro(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#B39237] focus:border-[#B39237]"
             >
               <option value="">Todos los estados</option>
               <option value="activo">Activos</option>
@@ -759,35 +788,91 @@ export default function Empleados() {
 
       {/* Tabla de empleados */}
       <div className="bg-white rounded-lg shadow border overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Lista de Empleados</h2>
+        <div className="overflow-x-auto">
+        <div className="p-4 md:p-6 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <h2 className="text-lg md:text-xl font-semibold text-gray-700">Lista de Empleados</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Mostrando {startIndex + 1} a {Math.min(endIndex, empleadosFiltrados.length)} de {empleadosFiltrados.length} empleados
+              </p>
+            </div>
             <button
               onClick={handleCrearEmpleado}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
+              className="bg-gradient-to-r from-[#B39237] to-[#D4AF37] text-white px-4 py-3 md:py-2 text-sm md:text-base rounded-lg hover:from-[#A0812F] hover:to-[#C19B2F] transition-all duration-200 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg w-full sm:w-auto"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span>Nuevo Empleado</span>
+              <i className="bx bx-plus text-lg md:text-xl"></i>
+              <span className="font-medium">Nuevo Empleado</span>
             </button>
           </div>
-          <p className="text-gray-600 mt-1">
-            Mostrando {empleadosFiltrados.length} de {empleados.length} empleados
-          </p>
         </div>
 
-        <DataTable
-          data={empleadosFiltrados}
-          columns={EMPLEADOS_COLUMNS}
-          onRowAction={handleRowAction}
-          loading={isLoading}
-          emptyMessage="No se encontraron empleados"
-          rowActions={['view', 'edit', 'toggle']}
-          rowKey="id_empleado"
-          showSearch={false}
-          showToolbar={false}
-        />
+          <DataTable
+            data={empleadosPaginados}
+            columns={EMPLEADOS_COLUMNS}
+            onRowAction={handleRowAction}
+            loading={isLoading}
+            emptyMessage="No se encontraron empleados"
+            rowActions={['view', 'edit', 'toggle']}
+            rowKey="id_empleado"
+            showSearch={false}
+            showToolbar={false}
+          />
+        </div>
+
+        {/* Paginador */}
+        {totalPages > 1 && (
+          <div className="px-4 md:px-6 py-4 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="text-xs md:text-sm text-gray-700 text-center sm:text-left">
+                Mostrando {startIndex + 1} a {Math.min(endIndex, empleadosFiltrados.length)} de {empleadosFiltrados.length} empleados
+              </div>
+              
+              <div className="flex items-center justify-center space-x-1 md:space-x-2">
+                {/* Botón página anterior */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className={`px-2 md:px-3 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors ${
+                    currentPage === 1
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <i className="bx bx-chevron-left text-lg"></i>
+                </button>
+
+                {/* Números de página */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-2 md:px-3 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors ${
+                      currentPage === page
+                        ? 'bg-[#B39237] text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                {/* Botón página siguiente */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className={`px-2 md:px-3 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors ${
+                    currentPage === totalPages
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <i className="bx bx-chevron-right text-lg"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal de vista detallada */}

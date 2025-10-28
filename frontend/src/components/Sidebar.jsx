@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-export default function Sidebar({ collapsed, onToggle, onLogout }) {
+export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -85,18 +85,11 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
   };
 
   return (
-    <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 min-h-full transition-all duration-300 flex flex-col`}>
-      {/* Header del Sidebar */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-end">
-        {/* Botón Toggle */}
-        <button
-          onClick={onToggle}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900"
-        >
-          <i className={`bx ${collapsed ? 'bx-chevron-right' : 'bx-chevron-left'} text-lg`}></i>
-        </button>
-      </div>
-      
+    <aside 
+      className={`fixed top-24 left-0 h-screen ${collapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 transition-all duration-500 ease-in-out flex flex-col z-10`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       {/* Navegación Principal */}
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
@@ -111,7 +104,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
               title={collapsed ? 'Dashboard' : ''}
             >
               <i className="bx bx-bar-chart-alt-2 text-xl"></i>
-              {!collapsed && <span>Dashboard</span>}
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Dashboard</span>
             </Link>
           </li>
           <li>
@@ -125,7 +118,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
               title={collapsed ? 'Empleados' : ''}
             >
               <i className="bx bx-group text-xl"></i>
-              {!collapsed && <span>Empleados</span>}
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Empleados</span>
             </Link>
           </li>
           <li>
@@ -139,7 +132,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
               title={collapsed ? 'Ubicaciones' : ''}
             >
               <i className="bx bx-map-pin text-xl"></i>
-              {!collapsed && <span>Ubicaciones</span>}
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Ubicaciones</span>
             </Link>
           </li>
           <li>
@@ -153,7 +146,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
               title={collapsed ? 'Áreas' : ''}
             >
               <i className="bx bx-buildings text-xl"></i>
-              {!collapsed && <span>Áreas</span>}
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Áreas</span>
             </Link>
           </li>
           <li>
@@ -167,7 +160,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
               title={collapsed ? 'Proveedores' : ''}
             >
               <i className="bx bx-store text-xl"></i>
-              {!collapsed && <span>Proveedores</span>}
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Proveedores</span>
             </Link>
           </li>
           {isAdmin && (
@@ -182,7 +175,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
                 title={collapsed ? 'Usuarios' : ''}
               >
                 <i className="bx bx-lock-alt text-xl"></i>
-                {!collapsed && <span>Usuarios</span>}
+                <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Usuarios</span>
               </Link>
             </li>
           )}
@@ -197,7 +190,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
               title={collapsed ? 'Dotaciones' : ''}
             >
               <i className="bx bx-package text-xl"></i>
-              {!collapsed && <span>Dotaciones</span>}
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Dotaciones</span>
             </Link>
           </li>
           <li>
@@ -211,7 +204,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
               title={collapsed ? 'Solicitudes' : ''}
             >
               <i className="bx bx-clipboard text-xl"></i>
-              {!collapsed && <span>Solicitudes</span>}
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Solicitudes</span>
             </Link>
           </li>
           <li>
@@ -225,7 +218,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
               title={collapsed ? 'Reportes' : ''}
             >
               <i className="bx bx-file text-xl"></i>
-              {!collapsed && <span>Reportes</span>}
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Reportes</span>
             </Link>
           </li>
           
@@ -241,22 +234,18 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className={`w-full flex items-center px-3 py-3 rounded-lg hover:bg-gray-50 transition-colors ${collapsed ? 'justify-center' : 'space-x-3'}`}
               >
-                <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 border-2 border-gray-300 shadow-sm">
                   {getUserInitial()}
                 </div>
-                {!collapsed && (
-                  <>
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="font-medium text-gray-900 text-sm truncate">
-                        {getUserName()}
-                      </div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {getUserEmail()}
-                      </div>
-                    </div>
-                    <i className={`bx bx-chevron-${userMenuOpen ? 'up' : 'down'} text-lg text-gray-400 flex-shrink-0`}></i>
-                  </>
-                )}
+                <div className={`flex-1 text-left min-w-0 transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
+                  <div className="font-medium text-gray-900 text-sm truncate">
+                    {getUserName()}
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {getUserEmail()}
+                  </div>
+                </div>
+                <i className={`bx bx-chevron-${userMenuOpen ? 'up' : 'down'} text-lg text-gray-400 flex-shrink-0 transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}></i>
               </button>
 
               {/* Menú Desplegable del Usuario */}
@@ -282,7 +271,7 @@ export default function Sidebar({ collapsed, onToggle, onLogout }) {
                       className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <i className="bx bx-log-out text-lg"></i>
-                      <span>Cerrar Sesión</span>
+                      <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Cerrar Sesión</span>
                     </button>
                   </div>
                 </div>

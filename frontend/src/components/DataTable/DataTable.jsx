@@ -184,7 +184,7 @@ const DataTable = ({
                             <svg 
                               className={`ml-1 h-4 w-4 ${
                                 sortConfig.key === column.key 
-                                  ? 'text-gray-900' 
+                                  ? 'text-gray-700' 
                                   : 'text-gray-400'
                               } ${
                                 sortConfig.key === column.key && sortConfig.direction === 'desc' 

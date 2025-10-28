@@ -209,7 +209,7 @@ EditModal.Form = ({
     const value = formData[field.name] ?? '';
     const error = errors[field.name];
 
-    const baseInputClass = `w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white/70 backdrop-blur-sm ${
+    const baseInputClass = `w-full px-3 py-2 md:px-4 md:py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white/70 backdrop-blur-sm text-sm md:text-base ${
       error ? 'border-red-400 bg-red-50/30' : 'border-gray-300 hover:border-gray-400'
     }`;
 
@@ -282,10 +282,10 @@ EditModal.Form = ({
 
   return (
     <form id="edit-form" onSubmit={onSubmit} className={`space-y-6 ${className}`}>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {fields.map(field => (
-          <div key={field.name} className={field.fullWidth ? 'col-span-2' : ''}>
-            <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 mb-2">
+          <div key={field.name} className={field.fullWidth ? 'md:col-span-2' : ''}>
+            <label htmlFor={field.name} className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
               {field.label}
               {field.required && <span className="text-red-500 ml-1">*</span>}
             </label>

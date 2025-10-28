@@ -93,11 +93,11 @@ ViewModal.Content = ({
     return String(value);
   };
 
-  const gridCols = columns === 1 ? 'grid-cols-1' : 'grid-cols-2';
+  const gridCols = columns === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2';
 
   return (
-    <div className={`space-y-6 ${className}`}>
-      <div className={`grid ${gridCols} gap-6`}>
+    <div className={`space-y-4 md:space-y-6 ${className}`}>
+      <div className={`grid ${gridCols} gap-4 md:gap-6`}>
         {displayFields.map((field) => {
           const value = data[field.key];
           
@@ -106,7 +106,7 @@ ViewModal.Content = ({
               <label className="block text-sm font-medium text-gray-700">
                 {field.label}
               </label>
-              <div className="text-gray-900 bg-gray-50/50 rounded-xl px-4 py-3 border border-gray-200/50 min-h-[2.75rem] flex items-center">
+              <div className="text-gray-700 bg-gray-50/50 rounded-xl px-3 py-2 md:px-4 md:py-3 border border-gray-200/50 min-h-[2.5rem] md:min-h-[2.75rem] flex items-center text-sm md:text-base">
                 {formatFieldValue(field, value)}
               </div>
             </div>
@@ -129,7 +129,7 @@ ViewModal.Field = ({
     <label className="block text-sm font-medium text-gray-700">
       {label}
     </label>
-    <div className="text-gray-900 bg-gray-50/50 rounded-xl px-4 py-3 border border-gray-200/50 min-h-[2.75rem] flex items-center">
+    <div className="text-gray-700 bg-gray-50/50 rounded-xl px-3 py-2 md:px-4 md:py-3 border border-gray-200/50 min-h-[2.5rem] md:min-h-[2.75rem] flex items-center text-sm md:text-base">
       {children}
     </div>
   </div>

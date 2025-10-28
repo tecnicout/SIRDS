@@ -119,7 +119,7 @@ const Modal = ({
 
   return (
     <div 
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${overlayClassName}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4 ${overlayClassName}`}
       onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
@@ -132,13 +132,13 @@ const Modal = ({
       {/* Modal con diseño mejorado */}
       <div 
         ref={modalRef}
-        className={`relative bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] overflow-hidden border border-gray-200/50 ${className}`}
+        className={`relative bg-white/95 backdrop-blur-lg rounded-lg md:rounded-2xl shadow-2xl w-full ${sizeClasses[size]} max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200/50 ${className}`}
       >
         {/* Header mejorado */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200/70 bg-gradient-to-r from-gray-50/80 to-white/80">
+          <div className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 border-b border-gray-200/70 bg-gradient-to-r from-gray-50/80 to-white/80">
             {title && (
-              <h3 id="modal-title" className="text-xl font-semibold text-gray-800">
+              <h3 id="modal-title" className="text-lg md:text-xl font-semibold text-gray-700 pr-4">
                 {title}
               </h3>
             )}
@@ -158,13 +158,13 @@ const Modal = ({
         )}
         
         {/* Contenido con scroll mejorado */}
-        <div className={`px-8 py-6 overflow-y-auto max-h-[calc(90vh-8rem)] ${contentClassName}`}>
+        <div className={`px-4 md:px-8 py-4 md:py-6 overflow-y-auto max-h-[calc(95vh-8rem)] md:max-h-[calc(90vh-8rem)] ${contentClassName}`}>
           {children}
         </div>
         
         {/* Footer mejorado */}
         {footer && (
-          <div className="flex justify-end space-x-3 px-8 py-6 border-t border-gray-200/70 bg-gradient-to-r from-gray-50/50 to-white/80">
+          <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-3 px-4 md:px-8 py-4 md:py-6 border-t border-gray-200/70 bg-gradient-to-r from-gray-50/50 to-white/80">
             {footer}
           </div>
         )}

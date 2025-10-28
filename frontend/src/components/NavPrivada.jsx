@@ -59,7 +59,7 @@ export default function NavPrivada({ onLogout }) {
   };
 
   return (
-    <header className="shadow-lg border-b w-full" style={{backgroundColor: '#B39237', borderBottomColor: '#B39237'}}>
+    <header className="fixed top-0 left-0 right-0 shadow-lg border-b w-full z-20" style={{backgroundColor: '#B39237', borderBottomColor: '#B39237'}}>
       <div className="w-full mx-auto px-6 sm:px-8 lg:px-12">
         <div className="flex items-center h-24">
           <div className="flex items-center space-x-6">
