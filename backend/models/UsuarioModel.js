@@ -312,20 +312,12 @@ class UsuarioModel {
             WHERE id_usuario = ?
         `;
         const result = await query(sql, [desactivadoPor, id]);
-
-        // Normalizar la firma del resultado. `query` usa mysql2/promise y puede
-        // devolver directamente el objeto result (con affectedRows) o un arreglo.
-        const affectedRows = (result && typeof result.affectedRows === 'number')
-            ? result.affectedRows
-            : (Array.isArray(result) && result[0] && typeof result[0].affectedRows === 'number')
-                ? result[0].affectedRows
-                : 0;
-
-        console.log(`[UsuarioModel.deactivate] id=${id}, actualizado_por=${desactivadoPor}, affectedRows=${affectedRows}`);
-        // También loguear el resultado crudo para facilitar debugging en caso de firmas inesperadas
-        console.debug('[UsuarioModel.deactivate] raw result:', result);
-
-        return affectedRows > 0;
+        try {
+            console.log(`[UsuarioModel.deactivate] id=${id}, actualizado_por=${desactivadoPor}, affectedRows=${result.affectedRows}`);
+        } catch (e) {
+            console.log('[UsuarioModel.deactivate] resultado no contiene affectedRows:', result);
+        }
+        return result.affectedRows > 0;
     }
 
     /**
@@ -343,18 +335,12 @@ class UsuarioModel {
             WHERE id_usuario = ?
         `;
         const result = await query(sql, [actualizadoPor, id]);
-
-        // Normalizar la firma del resultado similar a deactivate
-        const affectedRows = (result && typeof result.affectedRows === 'number')
-            ? result.affectedRows
-            : (Array.isArray(result) && result[0] && typeof result[0].affectedRows === 'number')
-                ? result[0].affectedRows
-                : 0;
-
-        console.log(`[UsuarioModel.activate] id=${id}, actualizado_por=${actualizadoPor}, affectedRows=${affectedRows}`);
-        console.debug('[UsuarioModel.activate] raw result:', result);
-
-        return affectedRows > 0;
+        try {
+            console.log(`[UsuarioModel.activate] id=${id}, actualizado_por=${actualizadoPor}, affectedRows=${result.affectedRows}`);
+        } catch (e) {
+            console.log('[UsuarioModel.activate] resultado no contiene affectedRows:', result);
+        }
+        return result.affectedRows > 0;
     }
 
     // ===========================================

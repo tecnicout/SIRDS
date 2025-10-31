@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
+function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   
-  const isActive = (path) => {
+  const isActive = useCallback((path) => {
     return location.pathname === path;
-  };
+  }, [location.pathname]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -22,9 +22,14 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogou
     }
   }, []);
 
-  const isAdmin = user?.id_rol === 4; // Solo Administrador (id_rol = 4)
+  // Cerrar menú de usuario al cambiar de ruta
+  useEffect(() => {
+    setUserMenuOpen(false);
+  }, [location.pathname]);
 
-  const getUserInitial = () => {
+  const isAdmin = useMemo(() => user?.id_rol === 4, [user?.id_rol]);
+
+  const getUserInitial = useMemo(() => {
     if (user?.nombre_completo) {
       return user.nombre_completo.charAt(0).toUpperCase();
     }
@@ -35,9 +40,9 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogou
       return user.username.charAt(0).toUpperCase();
     }
     return 'AD';
-  };
+  }, [user?.nombre_completo, user?.nombre, user?.username]);
 
-  const getUserName = () => {
+  const getUserName = useMemo(() => {
     if (user?.nombre_completo) {
       return user.nombre_completo;
     }
@@ -48,16 +53,16 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogou
       return user.username;
     }
     return 'Admin';
-  };
+  }, [user?.nombre_completo, user?.nombre, user?.apellido, user?.username]);
 
-  const getUserEmail = () => {
+  const getUserEmail = useMemo(() => {
     if (user?.email) {
       return user.email;
     }
     return 'admin@sirds.com';
-  };
+  }, [user?.email]);
 
-  const getUserRole = () => {
+  const getUserRole = useMemo(() => {
     if (user?.nombre_rol) {
       return user.nombre_rol.toUpperCase();
     }
@@ -68,9 +73,9 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogou
       return user.cargo.toUpperCase();
     }
     return 'EMPLEADO';
-  };
+  }, [user?.nombre_rol, user?.rol_sistema, user?.cargo]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     // Limpiar localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -82,7 +87,7 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogou
       // Fallback: forzar recarga y redirección
       window.location.replace('/login');
     }
-  };
+  }, [onLogout]);
 
   return (
     <aside 
@@ -235,14 +240,14 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogou
                 className={`w-full flex items-center px-3 py-3 rounded-lg hover:bg-gray-50 transition-colors ${collapsed ? 'justify-center' : 'space-x-3'}`}
               >
                 <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 border-2 border-gray-300 shadow-sm">
-                  {getUserInitial()}
+                  {getUserInitial}
                 </div>
                 <div className={`flex-1 text-left min-w-0 transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
                   <div className="font-medium text-gray-900 text-sm truncate">
-                    {getUserName()}
+                    {getUserName}
                   </div>
                   <div className="text-xs text-gray-500 truncate">
-                    {getUserEmail()}
+                    {getUserEmail}
                   </div>
                 </div>
                 <i className={`bx bx-chevron-${userMenuOpen ? 'up' : 'down'} text-lg text-gray-400 flex-shrink-0 transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}></i>
@@ -283,3 +288,5 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogou
     </aside>
   );
 }
+
+export default React.memo(Sidebar);

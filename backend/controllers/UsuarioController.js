@@ -9,8 +9,11 @@ class UsuarioController {
      */
     static async getAll(req, res) {
         try {
-            // Verificar permisos - Solo Administrador (id_rol = 4) puede ver usuarios
-            if (req.user.id_rol !== 4) {
+            // Verificar permisos - Solo administradores y recursos humanos pueden ver la lista completa
+            // Usar `nombre_rol` normalizado en el token para mayor claridad
+            const userRole = (req.user && (req.user.nombre_rol || req.user.rol_sistema)) ? req.user.nombre_rol || req.user.rol_sistema : '';
+            const puedeVer = ['administrador', 'recursos_humanos'].includes((userRole || '').toString().toLowerCase());
+            if (!puedeVer) {
                 return res.status(403).json({
                     success: false,
                     message: 'No tienes permisos para ver la lista de usuarios'
@@ -45,9 +48,10 @@ class UsuarioController {
 
             // Los usuarios pueden ver su propia información
             // Solo Administrador (id_rol = 4) puede ver cualquier usuario
+            const solicitadoId = Number(id);
             const puedeVer = (
-                parseInt(id) === idUsuarioSolicitante || 
-                req.user.id_rol === 4
+                solicitadoId === Number(idUsuarioSolicitante) || 
+                Number(req.user.id_rol) === 4
             );
 
             if (!puedeVer) {
@@ -89,7 +93,7 @@ class UsuarioController {
     static async create(req, res) {
         try {
             // Solo Administrador (id_rol = 4) puede crear usuarios
-            if (req.user.id_rol !== 4) {
+            if (Number(req.user.id_rol) !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden crear usuarios'
@@ -132,9 +136,16 @@ class UsuarioController {
                 password,
                 id_rol
             }, req.user.id_usuario);
+            if (!nuevoUsuario) {
+                console.error('[USUARIO CREATE] Error: Usuario creado pero no se pudo recuperar el registro');
+                return res.status(500).json({
+                    success: false,
+                    message: 'Usuario creado pero no se pudo recuperar el registro'
+                });
+            }
 
             // No devolver la contraseña en la respuesta
-            delete nuevoUsuario.password;
+            try { delete nuevoUsuario.password; } catch(e) { /* ignore */ }
 
             console.log('[USUARIO CREATE] ✅ Usuario creado exitosamente');
             res.status(201).json({
@@ -172,8 +183,8 @@ class UsuarioController {
             const idUsuarioSolicitante = req.user.id_usuario;
 
             // Verificar permisos
-            const esPropio = parseInt(id) === idUsuarioSolicitante;
-            const esAdmin = req.user.id_rol === 4; // Solo Administrador (id_rol = 4)
+            const esPropio = Number(id) === Number(idUsuarioSolicitante);
+            const esAdmin = Number(req.user.id_rol) === 4; // Solo Administrador (id_rol = 4)
 
             if (!esPropio && !esAdmin) {
                 return res.status(403).json({
@@ -248,7 +259,7 @@ class UsuarioController {
             const { id } = req.params;
 
             // Solo Administrador (id_rol = 4) puede desactivar usuarios
-            if (req.user.id_rol !== 4) {
+            if (Number(req.user.id_rol) !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden desactivar usuarios'
@@ -296,7 +307,7 @@ class UsuarioController {
             const { id } = req.params;
 
             // Solo Administrador (id_rol = 4) puede activar usuarios
-            if (req.user.id_rol !== 4) {
+            if (Number(req.user.id_rol) !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden activar usuarios'
@@ -337,7 +348,7 @@ class UsuarioController {
             const { newPassword } = req.body;
 
             // Solo Administrador (id_rol = 4) puede resetear contraseñas
-            if (req.user.id_rol !== 4) {
+            if (Number(req.user.id_rol) !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden resetear contraseñas'
@@ -381,15 +392,43 @@ class UsuarioController {
      */
     static async getEmployeesWithoutUser(req, res) {
         try {
-            // Solo administradores pueden ver empleados sin usuario
-            if (req.user.rol_sistema !== 'administrador') {
+            // Validación de permisos (mantener la lógica actual)
+            const rolActual = (req.user && (req.user.nombre_rol || req.user.rol_sistema))
+                ? (req.user.nombre_rol || req.user.rol_sistema).toString().toLowerCase()
+                : '';
+
+            if (rolActual !== 'administrador' && Number(req.user.id_rol) !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden ver esta información'
                 });
             }
 
-            const empleados = await UsuarioModel.getEmployeesWithoutUser();
+            // Usar el modelo de Empleado si existe: evita duplicar la query en UsuarioModel
+            let empleados = [];
+            try {
+                // Intentar usar EmpleadoModel existente (se esperaba que tenga getEmpleadosSinUsuario)
+                if (typeof EmpleadoModel.getEmpleadosSinUsuario === 'function') {
+                    empleados = await EmpleadoModel.getEmpleadosSinUsuario();
+                } else if (typeof require('../models/UsuarioModel').getEmployeesWithoutUser === 'function') {
+                    // Fallback: usar el método de UsuarioModel si existe
+                    const UsuarioModelFallback = require('../models/UsuarioModel');
+                    empleados = await UsuarioModelFallback.getEmployeesWithoutUser();
+                } else {
+                    throw new Error('No se encontró método para obtener empleados sin usuario (EmpleadoModel.getEmpleadosSinUsuario ni UsuarioModel.getEmployeesWithoutUser).');
+                }
+            } catch (innerErr) {
+                console.error('[UsuarioController.getEmployeesWithoutUser] Error al obtener desde modelos:', innerErr);
+                throw innerErr;
+            }
+
+            if (!Array.isArray(empleados)) {
+                console.error('[UsuarioController.getEmployeesWithoutUser] Respuesta inesperada del modelo:', empleados);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error al obtener empleados sin usuario'
+                });
+            }
 
             res.json({
                 success: true,
@@ -398,18 +437,14 @@ class UsuarioController {
             });
 
         } catch (error) {
-            console.error('Error al obtener empleados sin usuario:', error);
+            console.error('Error al obtener empleados sin usuario:', error.stack || error);
             res.status(500).json({
                 success: false,
                 message: 'Error al obtener empleados sin usuario',
-                error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+                error: process.env.NODE_ENV === 'development' ? (error.message || String(error)) : 'Error interno'
             });
         }
     }
-
-    /**
-     * Buscar usuarios
-     */
     static async search(req, res) {
         try {
             const { q } = req.query;
@@ -422,7 +457,9 @@ class UsuarioController {
             }
 
             // Verificar permisos para buscar usuarios
-            const puedeVer = ['administrador', 'recursos_humanos'].includes(req.user.rol_sistema);
+            // Use `nombre_rol` from the JWT payload (string role names) normalized
+            const userRoleSearch = (req.user && (req.user.nombre_rol || req.user.rol_sistema)) ? (req.user.nombre_rol || req.user.rol_sistema).toString().toLowerCase() : '';
+            const puedeVer = ['administrador', 'recursos_humanos'].includes(userRoleSearch);
             if (!puedeVer) {
                 return res.status(403).json({
                     success: false,
@@ -455,7 +492,8 @@ class UsuarioController {
     static async getStats(req, res) {
         try {
             // Solo administradores pueden ver estadísticas
-            if (req.user.rol_sistema !== 'administrador') {
+            const rolStats = (req.user && (req.user.nombre_rol || req.user.rol_sistema)) ? (req.user.nombre_rol || req.user.rol_sistema).toString().toLowerCase() : '';
+            if (rolStats !== 'administrador' && Number(req.user.id_rol) !== 4) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo administradores pueden ver estadísticas'
@@ -495,9 +533,9 @@ class UsuarioController {
                     message: 'Rol no válido'
                 });
             }
-
-            // Verificar permisos
-            const puedeVer = ['administrador', 'recursos_humanos'].includes(req.user.rol_sistema);
+            // Verificar permisos (usar nombre_rol desde el token)
+            const rolUsuarios = (req.user && (req.user.nombre_rol || req.user.rol_sistema)) ? (req.user.nombre_rol || req.user.rol_sistema).toString().toLowerCase() : '';
+            const puedeVer = ['administrador', 'recursos_humanos'].includes(rolUsuarios);
             if (!puedeVer) {
                 return res.status(403).json({
                     success: false,

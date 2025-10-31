@@ -41,33 +41,38 @@ const USUARIOS_COLUMNS = [
       </div>
     )
   },
-  {
-    key: 'nombre_rol',
-    label: 'Rol Sistema',
-    sortable: true,
-    render: (value, row) => {
-      const getRolBadgeColor = (rol) => {
-        switch (rol) {
-          case 'Administrador':
-            return 'bg-red-100 text-red-800';
-          case 'Recursos Humanos':
-            return 'bg-blue-100 text-blue-800';
-          case 'Almacen':
-            return 'bg-green-100 text-green-800';
-          case 'Compras':
-            return 'bg-purple-100 text-purple-800';
-          default:
-            return 'bg-gray-100 text-gray-800';
+      {
+        key: 'nombre_rol',
+        label: 'Rol Sistema',
+        sortable: true,
+        render: (value, row) => {
+          // Normalize value to lowercase for matching backend role keys
+          const rolKey = (value || '').toString().toLowerCase();
+          const getRolBadgeColor = (rol) => {
+            switch (rol) {
+              case 'administrador':
+                return 'bg-red-100 text-red-800';
+              case 'recursos_humanos':
+                return 'bg-blue-100 text-blue-800';
+              case 'almacen':
+                return 'bg-green-100 text-green-800';
+              case 'compras':
+                return 'bg-purple-100 text-purple-800';
+              default:
+                return 'bg-gray-100 text-gray-800';
+            }
+          };
+
+          // Display a human-friendly label (capitalize words)
+          const displayLabel = value ? value.toString().replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Sin rol';
+          
+          return (
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRolBadgeColor(rolKey)}`}>
+              {displayLabel}
+            </span>
+          );
         }
-      };
-      
-      return (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRolBadgeColor(value)}`}>
-          {value || 'Sin rol'}
-        </span>
-      );
-    }
-  },
+      },
   {
     key: 'usuario_activo',
     label: 'Estado',
@@ -663,10 +668,11 @@ export default function Usuarios() {
               onChange={(e) => setRolFiltro(e.target.value)}
             >
               <option value="">Todos los roles</option>
-              <option value="Administrador">Administrador</option>
-              <option value="Recursos Humanos">Recursos Humanos</option>
-              <option value="Almacen">Almacén</option>
-              <option value="Compras">Compras</option>
+              {/* value uses backend role keys (lowercase) while label is user-friendly */}
+              <option value="administrador">Administrador</option>
+              <option value="recursos_humanos">Recursos Humanos</option>
+              <option value="almacen">Almacén</option>
+              <option value="compras">Compras</option>
             </select>
           </div>
 

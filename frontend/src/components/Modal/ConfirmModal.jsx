@@ -70,7 +70,7 @@ const ConfirmModal = ({
         ></div>
 
         {/* Spacer para centrar el modal */}
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden={true}>
           &#8203;
         </span>
 

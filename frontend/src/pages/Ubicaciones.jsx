@@ -8,18 +8,17 @@ const UBICACIONES_COLUMNS = [
     key: 'nombre',
     label: 'Nombre',
     sortable: true,
+    width: '35%',
     render: (value, row) => (
-      <div className="flex items-center">
-        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-          <span className="text-blue-600 font-medium text-sm">
-            {value?.charAt(0)?.toUpperCase() || 'U'}
-          </span>
+      <div className="flex items-center py-2 px-3">
+        <div className="w-8 h-8 bg-gradient-to-r from-[#B39237] to-[#D4AF37] rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
+          <i className="bx bx-map-pin text-white text-sm"></i>
         </div>
-        <div className="ml-4">
-          <div className="text-sm font-medium text-gray-900">
+        <div className="ml-3 min-w-0 flex-1">
+          <div className="text-sm font-semibold text-gray-700">
             {value}
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-xs text-gray-500">
             ID: {row.id_ubicacion}
           </div>
         </div>
@@ -30,22 +29,56 @@ const UBICACIONES_COLUMNS = [
     key: 'tipo',
     label: 'Tipo',
     sortable: true,
-    render: (value, row) => (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        value === 'planta' 
-          ? 'bg-blue-100 text-blue-800' 
-          : 'bg-green-100 text-green-800'
-      }`}>
-        {value === 'planta' ? '🏭 Planta' : '📦 Bodega'}
-      </span>
-    )
+    width: '25%',
+    render: (value, row) => {
+      const getTypeConfig = (tipo) => {
+        switch (tipo) {
+          case 'planta':
+            return {
+              color: 'text-[#B39237]',
+              icon: 'bx-buildings',
+              label: 'Planta'
+            };
+          case 'maquila':
+            return {
+              color: 'text-gray-600',
+              icon: 'bx-cog',
+              label: 'Maquila'
+            };
+          case 'bodega':
+          default:
+            return {
+              color: 'text-gray-600',
+              icon: 'bx-package',
+              label: 'Bodega'
+            };
+        }
+      };
+
+      const config = getTypeConfig(value);
+      
+      return (
+        <div className="flex items-center py-2 px-2">
+          <span className={`inline-flex items-center text-sm font-bold ${config.color}`}>
+            <i className={`bx ${config.icon} text-base mr-2`}></i>
+            {config.label}
+          </span>
+        </div>
+      );
+    }
   },
   {
     key: 'direccion',
     label: 'Dirección',
+    width: '40%',
     render: (value, row) => (
-      <div className="text-sm text-gray-900 max-w-xs truncate">
-        {value || 'No especificada'}
+      <div className="flex items-center py-2 px-3">
+        <div className="w-6 h-6 bg-gray-400 rounded flex items-center justify-center flex-shrink-0">
+          <i className="bx bx-map text-white text-xs"></i>
+        </div>
+        <div className="ml-2 text-sm text-gray-700 min-w-0 flex-1">
+          {value || <span className="text-gray-400 italic">No especificada</span>}
+        </div>
       </div>
     )
   }
@@ -55,7 +88,18 @@ const UBICACIONES_COLUMNS = [
 const UBICACION_VIEW_FIELDS = [
   { key: 'id_ubicacion', label: 'ID' },
   { key: 'nombre', label: 'Nombre' },
-  { key: 'tipo', label: 'Tipo', render: (value) => value === 'planta' ? '🏭 Planta' : '📦 Bodega' },
+  { 
+    key: 'tipo', 
+    label: 'Tipo', 
+    render: (value) => {
+      switch (value) {
+        case 'planta': return 'Planta';
+        case 'maquila': return 'Maquila';
+        case 'bodega': return 'Bodega';
+        default: return value;
+      }
+    }
+  },
   { key: 'direccion', label: 'Dirección' }
 ];
 
@@ -76,8 +120,9 @@ const UBICACION_FORM_FIELDS = [
     required: true,
     fullWidth: false,
     options: [
-      { value: 'planta', label: '🏭 Planta' },
-      { value: 'bodega', label: '📦 Bodega' }
+      { value: 'planta', label: 'Planta' },
+      { value: 'maquila', label: 'Maquila' },
+      { value: 'bodega', label: 'Bodega' }
     ]
   },
   {
@@ -269,21 +314,19 @@ export default function Ubicaciones() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Ubicaciones</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Ubicaciones</h1>
           <p className="text-gray-600">Administra las plantas y bodegas del sistema</p>
         </div>
         <button
           onClick={handleNewUbicacion}
-          className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-5 py-2.5 font-medium transition-all duration-200 flex items-center gap-2 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          className="bg-gradient-to-r from-[#B39237] to-[#D4AF37] hover:from-[#A0812F] hover:to-[#C19B2F] text-white rounded-lg px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Nueva Ubicación
+          <i className="bx bx-plus text-lg"></i>
+          <span>Nueva Ubicación</span>
         </button>
       </div>
 
@@ -295,54 +338,67 @@ export default function Ubicaciones() {
       )}
 
       {/* Estadísticas rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-700">
                 {ubicaciones.length}
               </p>
               <p className="text-gray-600 text-sm">
                 Total Ubicaciones
               </p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+            <div className="w-10 h-10 bg-gradient-to-r from-[#B39237] to-[#D4AF37] rounded-lg flex items-center justify-center">
+              <i className="bx bx-map-pin text-white text-xl"></i>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-700">
                 {ubicaciones.filter(u => u.tipo === 'planta').length}
               </p>
               <p className="text-gray-600 text-sm">
                 Plantas
               </p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">🏭</span>
+            <div className="w-10 h-10 bg-gradient-to-r from-[#B39237] to-[#D4AF37] rounded-lg flex items-center justify-center">
+              <i className="bx bx-buildings text-white text-xl"></i>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-700">
+                {ubicaciones.filter(u => u.tipo === 'maquila').length}
+              </p>
+              <p className="text-gray-600 text-sm">
+                Maquilas
+              </p>
+            </div>
+            <div className="w-10 h-10 bg-gray-500 rounded-lg flex items-center justify-center">
+              <i className="bx bx-cog text-white text-xl"></i>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xl font-bold text-gray-700">
                 {ubicaciones.filter(u => u.tipo === 'bodega').length}
               </p>
               <p className="text-gray-600 text-sm">
                 Bodegas
               </p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">📦</span>
+            <div className="w-10 h-10 bg-gray-500 rounded-lg flex items-center justify-center">
+              <i className="bx bx-package text-white text-xl"></i>
             </div>
           </div>
         </div>
@@ -358,53 +414,21 @@ export default function Ubicaciones() {
         searchQuery={searchQuery}
         onSearch={setSearchQuery}
         onRowAction={handleRowAction}
-        actions={[
-          {
-            label: 'Ver',
-            action: 'view',
-            icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            ),
-            className: 'text-blue-600 hover:text-blue-900'
-          },
-          {
-            label: 'Editar',
-            action: 'edit',
-            icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            ),
-            className: 'text-green-600 hover:text-green-900'
-          },
-          {
-            label: 'Eliminar',
-            action: 'delete',
-            icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            ),
-            className: 'text-red-600 hover:text-red-900'
-          }
-        ]}
-        emptyState={{
-          icon: (
-            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          ),
-          title: 'No hay ubicaciones disponibles',
-          description: 'Comience creando una nueva ubicación',
-          action: {
-            label: 'Crear Primera Ubicación',
-            onClick: handleNewUbicacion
-          }
-        }}
+        rowActions={['view', 'edit', 'delete']}
+        emptyState={
+          <div className="p-8 text-center text-gray-500">
+            <i className="bx bx-map-pin text-4xl text-gray-400 mb-4"></i>
+            <h3 className="text-lg font-medium text-gray-700 mb-2">No hay ubicaciones disponibles</h3>
+            <p className="text-gray-500 mb-4">Comience creando una nueva ubicación</p>
+            <button
+              onClick={handleNewUbicacion}
+              className="bg-gradient-to-r from-[#B39237] to-[#D4AF37] hover:from-[#A0812F] hover:to-[#C19B2F] text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 mx-auto"
+            >
+              <i className="bx bx-plus"></i>
+              <span>Crear Primera Ubicación</span>
+            </button>
+          </div>
+        }
       />
 
       {/* Modal de Vista */}

@@ -76,8 +76,9 @@ class AuthController {
                 id_empleado: usuario.id_empleado,
                 username: usuario.username,
                 email_usuario: usuario.email_usuario,
-                id_rol: usuario.id_rol,
-                nombre_rol: usuario.nombre_rol,
+                id_rol: usuario.id_rol ? Number(usuario.id_rol) : null,
+                // Normalizar nombre_rol a minúsculas para mantener consistencia
+                nombre_rol: usuario.nombre_rol ? usuario.nombre_rol.toString().toLowerCase() : null,
                 nombre: usuario.nombre,
                 apellido: usuario.apellido,
                 cargo: usuario.cargo,
@@ -153,8 +154,8 @@ class AuthController {
                 data: {
                     id_usuario: usuario.id_usuario,
                     username: usuario.username,
-                    id_rol: usuario.id_rol,
-                    nombre_rol: usuario.nombre_rol,
+                    id_rol: usuario.id_rol ? Number(usuario.id_rol) : null,
+                    nombre_rol: usuario.nombre_rol ? usuario.nombre_rol.toString().toLowerCase() : null,
                     expires_at: usuario.exp ? new Date(usuario.exp * 1000) : null
                 }
             });

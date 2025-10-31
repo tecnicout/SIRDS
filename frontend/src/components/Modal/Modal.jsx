@@ -122,7 +122,7 @@ const Modal = ({
       className={`fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4 ${overlayClassName}`}
       onClick={handleBackdropClick}
       role="dialog"
-      aria-modal="true"
+  aria-modal={true}
       aria-labelledby={title ? 'modal-title' : undefined}
       {...props}
     >

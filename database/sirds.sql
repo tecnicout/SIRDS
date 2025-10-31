@@ -21,7 +21,7 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 -- GTID state at the beginning of the backup 
 --
 
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '27519af4-b434-11f0-aee2-f439092d7bcb:1-201';
+SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '27519af4-b434-11f0-aee2-f439092d7bcb:1-223';
 
 --
 -- Table structure for table `area`
@@ -67,7 +67,7 @@ CREATE TABLE `arearolkit` (
   CONSTRAINT `arearolkit_ibfk_1` FOREIGN KEY (`id_area`) REFERENCES `area` (`id_area`),
   CONSTRAINT `arearolkit_ibfk_2` FOREIGN KEY (`id_rol`) REFERENCES `rol` (`id_rol`),
   CONSTRAINT `arearolkit_ibfk_3` FOREIGN KEY (`id_kit`) REFERENCES `kitdotacion` (`id_kit`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -76,6 +76,7 @@ CREATE TABLE `arearolkit` (
 
 LOCK TABLES `arearolkit` WRITE;
 /*!40000 ALTER TABLE `arearolkit` DISABLE KEYS */;
+INSERT INTO `arearolkit` VALUES (1,1,1,3);
 /*!40000 ALTER TABLE `arearolkit` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -277,7 +278,7 @@ CREATE TABLE `empleado` (
 
 LOCK TABLES `empleado` WRITE;
 /*!40000 ALTER TABLE `empleado` DISABLE KEYS */;
-INSERT INTO `empleado` VALUES (1,'123456789','CC','Juan Carlos','Rodríguez Silva','2004-12-22','juan.rodriguez@empresa.com','300-123-4567','Operario Senior',1,1,1,'2025-07-02',0.00,NULL,2),(2,'123456798','CC','María Elena','González Pérez','2004-12-26','maria.gonzalez@empresa.com','301-234-5678','Supervisora de Calidad',0,2,4,'2025-07-02',0.00,NULL,2),(3,'123456987','CC','Carlos Andrés','Martínez López','2004-12-15','carlos.martinez@empresa.com','302-345-6789','Técnico de Mantenimiento',0,1,3,'2025-07-02',0.00,NULL,2),(4,'123654789','CC','Ana María','Hernández Castro','2004-12-21','ana.hernandez@empresa.com','303-456-7890','Auxiliar Administrativo',0,2,2,'2025-07-02',0.00,NULL,2),(5,'321456789','CC','Luis Fernando','Vargas Moreno','2004-12-21','luis.vargas@empresa.com','304-567-8901','Coordinador de Producción',1,1,1,'2025-07-02',0.00,NULL,2),(6,'321654987','CC','Sandra Patricia','Jiménez Ruiz','2004-12-21','sandra.jimenez@empresa.com','305-678-9012','Almacenista',0,2,7,'2025-07-02',0.00,NULL,2),(7,'369258147','CC','Diego Alejandro','Torres Gómez','2004-12-21','diego.torres@empresa.com','306-789-0123','Operario',1,1,5,'2025-07-02',0.00,NULL,2),(8,'258369147','CC','Claudia Marcela','Ramírez Soto','2004-12-21','claudia.ramirez@empresa.com','307-890-1234','Inspector de Calidad',1,2,4,'2025-07-02',0.00,NULL,2),(9,'147258369','CC','Fabian Murcia','Gomez','2004-12-21','murcia21.gmz@gmail.com','3102023478','Aprendiz sena',1,1,4,'2025-07-02',0.00,NULL,1),(10,'789456123','CC','Juan Sebastian ','Duran Castellanos','2004-12-21','jdurancastellanos21@gmail.com','3102023477','Aprendiz sena',1,1,2,'2025-07-02',0.00,NULL,2),(11,'987456322','CC','Ricardo Alexander','Bohorquez','2004-12-22','rbohorquez@arrozsonora.com.co','3102023456','Analista de Sistemas',1,1,1,'2025-10-07',19078700.00,'2025-10-16',2),(12,'1076200149','CC','Ricardo Alexander','Gomez','2023-06-07','murcia232gmz@gmail.com','3102023456','Aprendiz sena',0,1,19,'2025-10-06',1700666.00,'2025-10-31',2),(13,'9874567921','CC','Bodega Central','Duran Castellanos','2025-10-11','murcia21mz@gmail.com','3102023478','Analista de Sistemas',1,1,5,'2025-10-30',1999999.00,'2025-11-08',2),(14,'987456312','CC','Ricardo Alexanderrr','perez','2024-02-23','murciagmz@gmail.com','3102023477','Pasante pepe',0,1,19,'2025-10-01',1700000.00,'2027-10-21',12);
+INSERT INTO `empleado` VALUES (1,'123456789','CC','Juan Carlos','Rodríguez Silva','2004-12-22','juan.rodriguez@empresa.com','300-123-4567','Operario Senior',1,1,1,'2025-07-02',0.00,NULL,2),(2,'123456798','CC','María Elena','González Pérez','2004-12-26','maria.gonzalez@empresa.com','301-234-5678','Supervisora de Calidad',0,2,4,'2025-07-02',0.00,NULL,2),(3,'123456987','CC','Carlos Andrés','Martínez López','2004-12-15','carlos.martinez@empresa.com','302-345-6789','Técnico de Mantenimiento',0,1,3,'2025-07-02',0.00,NULL,2),(4,'123654789','CC','Ana María','Hernández Castro','2004-12-21','ana.hernandez@empresa.com','303-456-7890','Auxiliar Administrativo',0,2,2,'2025-07-02',0.00,NULL,2),(5,'321456789','CC','Luis Fernando','Vargas Moreno','2004-12-21','luis.vargas@empresa.com','304-567-8901','Coordinador de Producción',1,1,1,'2025-07-02',0.00,NULL,2),(6,'321654987','CC','Sandra Patricia','Jiménez Ruiz','2004-12-21','sandra.jimenez@empresa.com','305-678-9012','Almacenista',0,2,7,'2025-07-02',0.00,NULL,2),(7,'369258147','CC','Diego Alejandro','Torres Gómez','2004-12-21','diego.torres@empresa.com','306-789-0123','Operario',1,1,5,'2025-07-02',0.00,NULL,2),(8,'258369147','CC','Claudia Marcela','Ramírez Soto','2004-12-21','claudia.ramirez@empresa.com','307-890-1234','Inspector de Calidad',1,2,4,'2025-07-02',0.00,NULL,2),(9,'147258369','CC','Fabian Murcia','Gomez','2004-12-21','murcia21.gmz@gmail.com','3102023478','Aprendiz sena',1,1,4,'2025-07-02',0.00,NULL,1),(10,'789456123','CC','Juan Sebastian ','Duran Castellanos','2004-12-21','jdurancastellanos21@gmail.com','3102023477','Aprendiz sena',1,1,2,'2025-07-02',0.00,NULL,2),(11,'987456322','CC','Ricardo Alexander','Bohorquez','2004-12-22','rbohorquez@arrozsonora.com.co','3102023456','Analista de Sistemas',1,1,1,'2025-10-07',19078700.00,'2025-10-16',2),(12,'1076200149','CC','Ricardo Alexander','Gomez','2023-06-07','murcia232gmz@gmail.com','3102023456','Aprendiz sena',1,1,19,'2025-10-06',1700666.00,'2025-10-31',2),(13,'9874567921','CC','Bodega Central','Duran Castellanos','2025-10-11','murcia21mz@gmail.com','3102023478','Analista de Sistemas',1,1,5,'2025-10-30',1999999.00,'2025-11-08',2),(14,'987456312','CC','Ricardo Alexanderrr','perez','2024-02-23','murciagmz@gmail.com','3102023477','Pasante pepe',0,1,19,'2025-10-01',1700000.00,'2027-10-21',12);
 /*!40000 ALTER TABLE `empleado` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -303,7 +304,7 @@ CREATE TABLE `entregadotacion` (
   CONSTRAINT `entregadotacion_ibfk_1` FOREIGN KEY (`id_empleado`) REFERENCES `empleado` (`id_empleado`),
   CONSTRAINT `entregadotacion_ibfk_2` FOREIGN KEY (`id_dotacion`) REFERENCES `dotacion` (`id_dotacion`),
   CONSTRAINT `entregadotacion_ibfk_3` FOREIGN KEY (`id_talla`) REFERENCES `talla` (`id_talla`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -312,7 +313,7 @@ CREATE TABLE `entregadotacion` (
 
 LOCK TABLES `entregadotacion` WRITE;
 /*!40000 ALTER TABLE `entregadotacion` DISABLE KEYS */;
-INSERT INTO `entregadotacion` VALUES (1,1,1,3,2,'2024-10-01','Entrega kit completo operario'),(2,1,2,8,2,'2024-10-01','Entrega kit completo operario'),(3,1,3,29,1,'2024-10-01','Entrega kit completo operario'),(4,5,1,3,3,'2024-10-05','Kit supervisor - entrega completa'),(5,5,2,8,2,'2024-10-05','Kit supervisor - entrega completa');
+INSERT INTO `entregadotacion` VALUES (1,1,1,3,2,'2024-10-01','Entrega kit completo operario'),(2,1,2,8,2,'2024-10-01','Entrega kit completo operario'),(3,1,3,29,1,'2024-10-01','Entrega kit completo operario'),(4,5,1,3,3,'2024-10-05','Kit supervisor - entrega completa'),(5,5,2,8,2,'2024-10-05','Kit supervisor - entrega completa'),(6,1,1,4,1,'2025-10-29',NULL);
 /*!40000 ALTER TABLE `entregadotacion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -356,7 +357,7 @@ CREATE TABLE `historialmovimientos` (
   `usuario_responsable` varchar(100) DEFAULT NULL,
   `detalle_cambio` text,
   PRIMARY KEY (`id_historial`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -365,7 +366,7 @@ CREATE TABLE `historialmovimientos` (
 
 LOCK TABLES `historialmovimientos` WRITE;
 /*!40000 ALTER TABLE `historialmovimientos` DISABLE KEYS */;
-INSERT INTO `historialmovimientos` VALUES (1,'Empleado',1,'INSERT','2025-10-07 10:05:01','admin','Registro nuevo empleado Juan Carlos Rodríguez'),(2,'SolicitudDotacion',1,'INSERT','2025-10-07 10:05:01','supervisor','Nueva solicitud kit operario'),(3,'StockDotacion',1,'UPDATE','2025-10-07 10:05:01','almacenista','Actualización stock por entrega'),(4,'EntregaDotacion',1,'INSERT','2025-10-07 10:05:01','almacenista','Registro entrega a empleado'),(5,'PedidoCompras',1,'INSERT','2025-10-07 10:05:01','admin','Nuevo pedido de compra generado');
+INSERT INTO `historialmovimientos` VALUES (1,'Empleado',1,'INSERT','2025-10-07 10:05:01','admin','Registro nuevo empleado Juan Carlos Rodríguez'),(2,'SolicitudDotacion',1,'INSERT','2025-10-07 10:05:01','supervisor','Nueva solicitud kit operario'),(3,'StockDotacion',1,'UPDATE','2025-10-07 10:05:01','almacenista','Actualización stock por entrega'),(4,'EntregaDotacion',1,'INSERT','2025-10-07 10:05:01','almacenista','Registro entrega a empleado'),(5,'PedidoCompras',1,'INSERT','2025-10-07 10:05:01','admin','Nuevo pedido de compra generado'),(6,'entregadotacion',6,'INSERT','2025-10-29 12:24:09','sistema','Entrega registrada: Camisa Polo Empresa - Cantidad: 1 - Empleado: Juan Carlos Rodríguez Silva');
 /*!40000 ALTER TABLE `historialmovimientos` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -540,7 +541,7 @@ CREATE TABLE `stockdotacion` (
 
 LOCK TABLES `stockdotacion` WRITE;
 /*!40000 ALTER TABLE `stockdotacion` DISABLE KEYS */;
-INSERT INTO `stockdotacion` VALUES (1,1,2,7,3,150,'2025-10-07 10:05:01'),(2,1,3,7,3,200,'2025-10-07 10:05:01'),(3,1,4,7,3,100,'2025-10-07 10:05:01'),(4,2,7,7,3,80,'2025-10-07 10:05:01'),(5,2,8,7,3,120,'2025-10-07 10:05:01'),(6,2,9,7,3,90,'2025-10-07 10:05:01'),(7,3,29,7,3,50,'2025-10-07 10:05:01'),(8,3,30,7,3,45,'2025-10-07 10:05:01'),(9,3,31,7,3,40,'2025-10-07 10:05:01'),(10,4,1,7,3,200,'2025-10-07 10:05:01'),(11,7,1,7,3,300,'2025-10-07 10:05:01');
+INSERT INTO `stockdotacion` VALUES (1,1,2,7,3,150,'2025-10-07 10:05:01'),(2,1,3,7,3,200,'2025-10-07 10:05:01'),(3,1,4,7,3,99,'2025-10-29 12:24:09'),(4,2,7,7,3,80,'2025-10-07 10:05:01'),(5,2,8,7,3,120,'2025-10-07 10:05:01'),(6,2,9,7,3,90,'2025-10-07 10:05:01'),(7,3,29,7,3,50,'2025-10-07 10:05:01'),(8,3,30,7,3,45,'2025-10-07 10:05:01'),(9,3,31,7,3,40,'2025-10-07 10:05:01'),(10,4,1,7,3,200,'2025-10-07 10:05:01'),(11,7,1,7,3,300,'2025-10-07 10:05:01');
 /*!40000 ALTER TABLE `stockdotacion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -582,10 +583,10 @@ DROP TABLE IF EXISTS `ubicacion`;
 CREATE TABLE `ubicacion` (
   `id_ubicacion` int NOT NULL AUTO_INCREMENT,
   `nombre` varchar(100) NOT NULL,
-  `tipo` enum('planta','bodega') NOT NULL,
+  `tipo` enum('planta','bodega','maquila') NOT NULL,
   `direccion` text,
   PRIMARY KEY (`id_ubicacion`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -594,7 +595,7 @@ CREATE TABLE `ubicacion` (
 
 LOCK TABLES `ubicacion` WRITE;
 /*!40000 ALTER TABLE `ubicacion` DISABLE KEYS */;
-INSERT INTO `ubicacion` VALUES (1,'Planta Principal Bogotá','planta','Av. Caracas #45-67, Bogotá D.C.'),(2,'Planta Medellín','planta','Carrera 50 #23-45, Medellín, Antioquia'),(3,'Bodega Central','planta','Zona Industrial, Calle 13 #78-90, Bogotá D.C.'),(9,'UBICACIÓN TEMPORAL - REASIGNADA','bodega','Áreas reasignadas temporalmente por eliminación de ubicación'),(12,'La Maria','planta','Saldaña-Purificacion');
+INSERT INTO `ubicacion` VALUES (1,'Planta Principal Bogotá','planta','Av. Caracas #45-67, Bogotá D.C.'),(2,'Planta Medellín','planta','Carrera 50 #23-45, Medellín, Antioquia'),(3,'Bodega Central','planta','Zona Industrial, Calle 13 #78-90, Bogotá D.C.'),(9,'UBICACIÓN TEMPORAL - REASIGNADA','bodega','Áreas reasignadas temporalmente por eliminación de ubicación'),(12,'La Maria','planta','Saldaña-Purificacion'),(13,'SonoMaquila','maquila','Ibague');
 /*!40000 ALTER TABLE `ubicacion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -633,7 +634,7 @@ CREATE TABLE `usuario` (
   CONSTRAINT `usuario_ibfk_1` FOREIGN KEY (`id_empleado`) REFERENCES `empleado` (`id_empleado`) ON DELETE CASCADE,
   CONSTRAINT `usuario_ibfk_2` FOREIGN KEY (`creado_por`) REFERENCES `usuario` (`id_usuario`) ON DELETE SET NULL,
   CONSTRAINT `usuario_rol` FOREIGN KEY (`id_rol`) REFERENCES `rol` (`id_rol`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -642,7 +643,7 @@ CREATE TABLE `usuario` (
 
 LOCK TABLES `usuario` WRITE;
 /*!40000 ALTER TABLE `usuario` DISABLE KEYS */;
-INSERT INTO `usuario` VALUES (1,9,'fabianmurcia.gomez','murcia21.gmz@gmail.com','$2a$12$lx3o6GMtKRDX/4bIUg1z8OntlSmYksOhm6kcISDR1L.g0tWkj/lLG',4,1,'2025-10-28 15:36:11','2025-10-15 08:40:49','2025-10-28 15:36:11',NULL,NULL,NULL,NULL),(2,2,'mariaelena.gonzalezperez','maria.gonzalez@gmail.com','$2a$12$xLHbVlxZ/mytnpbINq48y.fvzi1rkh74VVnFfjUIjmdXzkNeZcOcC',2,1,'2025-10-15 10:20:57','2025-10-15 09:48:54','2025-10-22 11:15:22',1,1,NULL,NULL),(3,10,'juansebastian.durancastellanos','jdurancastellanos21@gmail.com','$2a$12$g0Q4FGAe78qgkRq.VyE2mebYLZGR.zzVe4W6L7qMdNMZ2JiiDy7tO',2,0,'2025-10-21 15:57:01','2025-10-21 10:41:14','2025-10-22 07:43:16',1,1,NULL,NULL);
+INSERT INTO `usuario` VALUES (1,9,'fabianmurcia.gomez','murcia21.gmz@gmail.com','$2a$12$lx3o6GMtKRDX/4bIUg1z8OntlSmYksOhm6kcISDR1L.g0tWkj/lLG',4,1,'2025-10-31 12:04:41','2025-10-15 08:40:49','2025-10-31 12:04:41',NULL,NULL,NULL,NULL),(2,2,'mariaelena.gonzalezperez','maria.gonzalez@gmail.com','$2a$12$xLHbVlxZ/mytnpbINq48y.fvzi1rkh74VVnFfjUIjmdXzkNeZcOcC',2,1,'2025-10-15 10:20:57','2025-10-15 09:48:54','2025-10-22 11:15:22',1,1,NULL,NULL),(3,10,'juansebastian.durancastellanos','jdurancastellanos21@gmail.com','$2a$12$g0Q4FGAe78qgkRq.VyE2mebYLZGR.zzVe4W6L7qMdNMZ2JiiDy7tO',3,0,'2025-10-21 15:57:01','2025-10-21 10:41:14','2025-10-31 07:26:29',1,1,NULL,NULL),(4,12,'pepito','rbohorquez@arrozsonora.com.co','$2a$12$OJ6QWvnUQ.3/vAWbHrc93uOWu7ziQwzjgAnTvAtRtfAUNY2YQVUZC',1,1,NULL,'2025-10-31 12:10:46','2025-10-31 12:10:55',1,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `usuario` ENABLE KEYS */;
 UNLOCK TABLES;
 SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
@@ -656,4 +657,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-10-28 15:57:56
+-- Dump completed on 2025-10-31 12:17:53

@@ -38,6 +38,32 @@ const authMiddleware = async (req, res, next) => {
             });
         }
 
+        // Normalizar información de rol en el payload.
+        // El AuthController debería incluir `id_rol` y `nombre_rol`.
+        // Si faltara alguno, intentamos rellenarlo desde la BD usando id_usuario.
+        try {
+            if (payload.id_usuario) {
+                // Si hay campos faltantes o nulos, intentar completar desde la DB
+                const usuarioFromDb = await UsuarioModel.getById(payload.id_usuario);
+                if (usuarioFromDb) {
+                    payload.id_rol = payload.id_rol ? Number(payload.id_rol) : (usuarioFromDb.id_rol ? Number(usuarioFromDb.id_rol) : null);
+                    payload.nombre_rol = payload.nombre_rol || usuarioFromDb.nombre_rol || usuarioFromDb.rol_sistema || null;
+                } else {
+                    // Asegurar tipos aunque no tengamos DB
+                    payload.id_rol = payload.id_rol ? Number(payload.id_rol) : null;
+                    payload.nombre_rol = payload.nombre_rol || null;
+                }
+            } else {
+                payload.id_rol = payload.id_rol ? Number(payload.id_rol) : null;
+                payload.nombre_rol = payload.nombre_rol || null;
+            }
+        } catch (dbErr) {
+            console.error('Error obteniendo rol desde DB en authMiddleware:', dbErr);
+            // No fallar por esto; seguimos con lo que tengamos en el token pero normalizamos tipos
+            payload.id_rol = payload.id_rol ? Number(payload.id_rol) : null;
+            payload.nombre_rol = payload.nombre_rol || null;
+        }
+
         // Opcional: Verificar en tiempo real que el usuario siga activo
         // Esto agrega una consulta a la DB pero mejora la seguridad
         if (process.env.VERIFY_USER_ON_REQUEST === 'true') {
@@ -50,8 +76,14 @@ const authMiddleware = async (req, res, next) => {
             }
         }
 
-        // Adjuntar información del usuario al request
+        // Normalizar nombre_rol a minúsculas (si existe) y adjuntar al request
         req.user = payload;
+        if (req.user.nombre_rol) {
+            try { req.user.nombre_rol = req.user.nombre_rol.toString().toLowerCase(); } catch (e) { /* ignore */ }
+        }
+        if (req.user.id_rol) {
+            req.user.id_rol = Number(req.user.id_rol);
+        }
         next();
 
     } catch (error) {
@@ -85,10 +117,12 @@ const requireRoleById = (idsRolesPermitidos) => {
             });
         }
 
-        if (!idsRolesPermitidos.includes(req.user.id_rol)) {
+        const userRoleId = Number(req.user.id_rol);
+        const allowed = idsRolesPermitidos.map(r => Number(r));
+        if (!allowed.includes(userRoleId)) {
             return res.status(403).json({
                 success: false,
-                message: `Acceso denegado. Solo administradores pueden realizar esta acción.`
+                message: `Acceso denegado. Roles requeridos: ${allowed.join(', ')}`
             });
         }
 
@@ -110,7 +144,11 @@ const requireRole = (rolesPermitidos) => {
             });
         }
 
-        if (!rolesPermitidos.includes(req.user.nombre_rol)) {
+        // Normalizar both sides to lowercase strings for robust comparison
+        const userRole = (req.user.nombre_rol || req.user.rol_sistema || '').toString().toLowerCase();
+        const allowed = rolesPermitidos.map(r => r.toString().toLowerCase());
+
+        if (!allowed.includes(userRole)) {
             return res.status(403).json({
                 success: false,
                 message: `Acceso denegado. Roles requeridos: ${rolesPermitidos.join(', ')}`

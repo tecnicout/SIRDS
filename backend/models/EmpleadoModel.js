@@ -180,19 +180,27 @@ class EmpleadoModel {
 
     // Obtener empleados sin usuario asignado (para módulo de usuarios)
     static async getEmpleadosSinUsuario() {
-        const sql = `
-            SELECT 
-                e.*,
-                g.nombre as genero_nombre,
-                a.nombre_area
-            FROM Empleado e
-            LEFT JOIN Genero g ON e.id_genero = g.id_genero
-            LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Usuario u ON e.id_empleado = u.id_empleado
-            WHERE u.id_empleado IS NULL AND e.estado = 1
-            ORDER BY e.apellido, e.nombre
-        `;
-        return await query(sql);
+        try {
+            const sql = `
+                SELECT 
+                    e.*,
+                    g.nombre as genero_nombre,
+                    a.nombre_area
+                FROM Empleado e
+                LEFT JOIN Genero g ON e.id_genero = g.id_genero
+                LEFT JOIN Area a ON e.id_area = a.id_area
+                LEFT JOIN Usuario u ON e.id_empleado = u.id_empleado
+                WHERE u.id_empleado IS NULL AND e.estado = 1
+                ORDER BY e.apellido, e.nombre
+            `;
+
+            const result = await query(sql);
+            return result;
+        } catch (error) {
+            console.error('[EmpleadoModel.getEmpleadosSinUsuario] Error al consultar empleados sin usuario:', error);
+            // Devolver arreglo vacío para evitar que controladores no manejen excepciones
+            return [];
+        }
     }
 
     // Verificar si la identificación ya existe

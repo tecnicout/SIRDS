@@ -8,6 +8,7 @@ import Ubicaciones from './pages/Ubicaciones';
 import Areas from './pages/Areas';
 import Usuarios from './pages/Usuarios';
 import Proveedores from './pages/Proveedores';
+import Dotaciones from './pages/Dotaciones';
 import DashboardLayout from './components/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
@@ -533,6 +534,18 @@ function App() {
                     <Usuarios />
                   </DashboardLayout>
                 </AdminRoute>
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Ruta de Dotaciones */}
+          <Route 
+            path="/dotaciones" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout onLogout={handleLogout}>
+                  <Dotaciones />
+                </DashboardLayout>
               </ProtectedRoute>
             } 
           />

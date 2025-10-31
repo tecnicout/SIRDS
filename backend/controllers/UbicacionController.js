@@ -61,10 +61,10 @@ class UbicacionController {
                 });
             }
 
-            if (!['planta', 'bodega'].includes(tipo)) {
+            if (!['planta', 'bodega', 'maquila'].includes(tipo)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Tipo debe ser "planta" o "bodega"'
+                    message: 'Tipo debe ser "planta", "bodega" o "maquila"'
                 });
             }
 
@@ -108,10 +108,10 @@ class UbicacionController {
                 });
             }
 
-            if (!['planta', 'bodega'].includes(tipo)) {
+            if (!['planta', 'bodega', 'maquila'].includes(tipo)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Tipo debe ser "planta" o "bodega"'
+                    message: 'Tipo debe ser "planta", "bodega" o "maquila"'
                 });
             }
 
@@ -204,10 +204,10 @@ class UbicacionController {
         try {
             const { tipo } = req.params;
 
-            if (!['planta', 'bodega'].includes(tipo)) {
+            if (!['planta', 'bodega', 'maquila'].includes(tipo)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Tipo debe ser "planta" o "bodega"'
+                    message: 'Tipo debe ser "planta", "bodega" o "maquila"'
                 });
             }
 
