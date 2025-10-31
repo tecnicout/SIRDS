@@ -2,16 +2,17 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 // Configuración de la conexión a la base de datos
+// Aceptar varias variantes de variables de entorno para compatibilidad
 const dbConfig = {
-    // Usar 127.0.0.1 por defecto evita problemas en Windows donde 'localhost'
-    // puede resolverse a ::1 (IPv6) y MySQL está escuchando solo en 127.0.0.1.
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'Ams35117',
-    database: process.env.DB_NAME || 'SIRDS',
+    // Usar 127.0.0.1 por defecto para evitar problemas de resolución a ::1 en Windows
+    host: process.env.DB_HOST || process.env.DB_HOSTNAME || '127.0.0.1',
+    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+    user: process.env.DB_USER || process.env.DB_USERNAME || 'root',
+    // Permitir DB_PASSWORD o DB_PASS según convenga al entorno
+    password: process.env.DB_PASSWORD || process.env.DB_PASS || '',
+    database: process.env.DB_NAME || process.env.DB_DATABASE || 'SIRDS',
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: process.env.DB_CONNECTION_LIMIT ? Number(process.env.DB_CONNECTION_LIMIT) : 10,
     queueLimit: 0
 };
 
@@ -26,7 +27,17 @@ const testConnection = async () => {
         connection.release();
         return true;
     } catch (error) {
-        console.error('❌ Error al conectar con MySQL:', error.message);
+        // Log detallado sin exponer credenciales
+        console.error('❌ Error al conectar con MySQL:', {
+            message: error.message,
+            code: error.code,
+            errno: error.errno,
+            stack: error.stack ? error.stack.split('\n')[0] : undefined,
+            host: dbConfig.host,
+            port: dbConfig.port,
+            database: dbConfig.database,
+            user: dbConfig.user
+        });
         return false;
     }
 };
@@ -37,15 +48,12 @@ const query = async (sql, params = []) => {
         const [rows] = await pool.execute(sql, params);
         return rows;
     } catch (error) {
-        // Log detallado para debugging: incluir código de error y stack
         console.error('Error en consulta SQL:', {
             message: error.message,
             code: error.code,
             errno: error.errno,
-            sqlMessage: error.sqlMessage,
-            stack: error.stack
+            sqlMessage: error.sqlMessage
         });
-        // Re-lanzar para que el controlador lo capture y retorne 500
         throw error;
     }
 };
