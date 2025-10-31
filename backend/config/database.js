@@ -16,28 +16,48 @@ const dbConfig = {
     queueLimit: 0
 };
 
-// Crear pool de conexiones
-const pool = mysql.createPool(dbConfig);
+// Crear pool de conexiones (se declara let para permitir reemplazar el pool
+// si intentamos reconectar usando 127.0.0.1 como fallback)
+let pool = mysql.createPool(dbConfig);
 
 // Función para probar la conexión
 const testConnection = async () => {
+    // Intentar conectarse al pool actual
     try {
         const connection = await pool.getConnection();
-        console.log('✅ Conexión a MySQL establecida correctamente');
+        console.log('✅ Conexión a MySQL establecida correctamente (host:', dbConfig.host, ')');
         connection.release();
         return true;
     } catch (error) {
-        // Log detallado sin exponer credenciales
-        console.error('❌ Error al conectar con MySQL:', {
+        // Log conciso del error inicial
+        console.error('❌ Error al conectar con MySQL (primer intento):', {
             message: error.message,
             code: error.code,
-            errno: error.errno,
-            stack: error.stack ? error.stack.split('\n')[0] : undefined,
             host: dbConfig.host,
             port: dbConfig.port,
-            database: dbConfig.database,
-            user: dbConfig.user
+            database: dbConfig.database
         });
+
+        // Si el host es 'localhost' o '::1' intentamos un fallback a 127.0.0.1
+        const normalizedHost = (dbConfig.host || '').toString();
+        if (normalizedHost === 'localhost' || normalizedHost === '::1') {
+            try {
+                console.log('🔁 Intentando reconectar usando 127.0.0.1 como fallback...');
+                const fallbackConfig = Object.assign({}, dbConfig, { host: '127.0.0.1' });
+                // Reemplazar pool temporalmente
+                pool = mysql.createPool(fallbackConfig);
+                const conn2 = await pool.getConnection();
+                console.log('✅ Conexión establecida correctamente usando 127.0.0.1');
+                conn2.release();
+                // Actualizar dbConfig.host para reflejar el cambio en logs
+                dbConfig.host = '127.0.0.1';
+                return true;
+            } catch (err2) {
+                console.error('❌ Fallback a 127.0.0.1 falló:', { message: err2.message, code: err2.code });
+                // no retornamos aún; caemos al return false
+            }
+        }
+
         return false;
     }
 };
