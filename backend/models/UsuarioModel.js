@@ -229,8 +229,23 @@ class UsuarioModel {
             
             console.log('[USUARIO CREATE] ✅ Usuario insertado con ID:', result.insertId);
             
-            // Obtener el usuario creado
-            const newUser = await this.findByCredential(username);
+            // Intentar obtener el usuario creado por username; si falla, usar getById con insertId
+            let newUser = null;
+            try {
+                newUser = await this.findByCredential(username);
+            } catch (err) {
+                console.warn('[USUARIO CREATE] warn: findByCredential falló, intentando getById', err);
+            }
+
+            if (!newUser) {
+                // Fallback directo por ID usando getById (asegura retornar el registro)
+                try {
+                    newUser = await this.getById(result.insertId);
+                } catch (err) {
+                    console.error('[USUARIO CREATE] Error obteniendo usuario por ID (fallback):', err);
+                }
+            }
+
             return newUser;
             
         } catch (error) {
@@ -297,7 +312,20 @@ class UsuarioModel {
             WHERE id_usuario = ?
         `;
         const result = await query(sql, [desactivadoPor, id]);
-        return result.affectedRows > 0;
+
+        // Normalizar la firma del resultado. `query` usa mysql2/promise y puede
+        // devolver directamente el objeto result (con affectedRows) o un arreglo.
+        const affectedRows = (result && typeof result.affectedRows === 'number')
+            ? result.affectedRows
+            : (Array.isArray(result) && result[0] && typeof result[0].affectedRows === 'number')
+                ? result[0].affectedRows
+                : 0;
+
+        console.log(`[UsuarioModel.deactivate] id=${id}, actualizado_por=${desactivadoPor}, affectedRows=${affectedRows}`);
+        // También loguear el resultado crudo para facilitar debugging en caso de firmas inesperadas
+        console.debug('[UsuarioModel.deactivate] raw result:', result);
+
+        return affectedRows > 0;
     }
 
     /**
@@ -315,7 +343,18 @@ class UsuarioModel {
             WHERE id_usuario = ?
         `;
         const result = await query(sql, [actualizadoPor, id]);
-        return result.affectedRows > 0;
+
+        // Normalizar la firma del resultado similar a deactivate
+        const affectedRows = (result && typeof result.affectedRows === 'number')
+            ? result.affectedRows
+            : (Array.isArray(result) && result[0] && typeof result[0].affectedRows === 'number')
+                ? result[0].affectedRows
+                : 0;
+
+        console.log(`[UsuarioModel.activate] id=${id}, actualizado_por=${actualizadoPor}, affectedRows=${affectedRows}`);
+        console.debug('[UsuarioModel.activate] raw result:', result);
+
+        return affectedRows > 0;
     }
 
     // ===========================================
@@ -501,8 +540,10 @@ class UsuarioModel {
         }
 
         // Validar rol
-        const rolesValidos = [1, 2, 3]; // IDs de roles válidos
-        if (!userData.id_rol || !rolesValidos.includes(userData.id_rol)) {
+        // Aceptar los IDs de rol que usa el sistema. Añadir 4 (administrador)
+        // para mantener compatibilidad con controladores que usan id_rol === 4.
+        const rolesValidos = [1, 2, 3, 4]; // IDs de roles válidos (incluye 4 = administrador)
+        if (!userData.id_rol || !rolesValidos.includes(Number(userData.id_rol))) {
             errors.push('Rol del sistema no es válido');
         }
 
