@@ -1,4 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { AuthProvider } from './contexts/AuthContext';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import 'boxicons/css/boxicons.min.css';
 import './index.css';
@@ -413,9 +414,10 @@ function App() {
   };
 
   return (
-    <Router>
-      <div className="min-h-screen" >
-        <Routes>
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen" >
+          <Routes>
           {/* Ruta pública - Landing Page */}
           <Route 
             path="/" 
@@ -552,9 +554,10 @@ function App() {
           
           {/* Redirección por defecto */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
-    </Router>
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

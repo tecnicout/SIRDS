@@ -13,6 +13,12 @@ router.get('/', DotacionesController.getAll);
 
 // Obtener todas las entregas
 router.get('/entregas', DotacionesController.getEntregas);
+// Actualizar entrega
+router.put('/entregas/:id', DotacionesController.updateEntrega);
+// Eliminar entrega
+router.delete('/entregas/:id', DotacionesController.deleteEntrega);
+// Items de una entrega
+router.get('/entregas/:id/items', DotacionesController.getEntregaItems);
 
 // Obtener próximas entregas (próximas a vencer)
 router.get('/proximas', DotacionesController.getProximas);
@@ -36,5 +42,15 @@ router.get('/empleado/:documento', DotacionesController.buscarEmpleadoPorDocumen
 
 // Registrar nueva entrega
 router.post('/entregar', DotacionesController.registrarEntrega);
+
+// === CRUD Dotación (ítems) ===
+// Obtener ítem por ID (detalle)
+router.get('/:id', DotacionesController.getByIdItem);
+// Crear ítem de dotación
+router.post('/', DotacionesController.createItem);
+// Actualizar ítem
+router.put('/:id', DotacionesController.updateItem);
+// Eliminar ítem
+router.delete('/:id', DotacionesController.deleteItem);
 
 module.exports = router;

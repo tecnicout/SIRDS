@@ -1,90 +1,463 @@
 const { query } = require('../config/database');
+const DotacionModel = require('../models/DotacionModel');
 
 class DotacionesController {
-    // Obtener todas las dotaciones con información relacionada
+    // Obtener catálogo de ítems de dotación (para construcción de kits, formularios, etc.)
+    // Mantener este endpoint SIMPLE: si se necesitan entregas usar /api/dotaciones/entregas
     static async getAll(req, res) {
         try {
-            const sql = `
-                SELECT 
-                    d.id_dotacion,
-                    d.nombre_dotacion,
-                    d.descripcion,
-                    d.talla_requerida,
-                    d.unidad_medida,
-                    d.precio_unitario,
-                    c.nombre_categoria,
-                    p.nombre as nombre_proveedor,
-                    p.telefono as telefono_proveedor,
-                    p.email as email_proveedor
-                FROM dotacion d
-                LEFT JOIN categoriadotacion c ON d.id_categoria = c.id_categoria
-                LEFT JOIN proveedor p ON d.id_proveedor = p.id_proveedor
-                ORDER BY d.nombre_dotacion
-            `;
-            
-            const dotaciones = await query(sql);
-            
-            res.json({
+            const { search = '', requiere_talla = '', id_categoria = '' } = req.query || {};
+
+            // Obtener todas las dotaciones desde el modelo principal
+            let dotaciones = await DotacionModel.getAll();
+
+            // Filtros en memoria (dataset normalmente pequeño). Si crece, mover a SQL parametrizado.
+            if (search) {
+                const s = String(search).toLowerCase();
+                dotaciones = dotaciones.filter(d =>
+                    String(d.nombre_dotacion || '').toLowerCase().includes(s) ||
+                    String(d.descripcion || '').toLowerCase().includes(s)
+                );
+            }
+            if (requiere_talla !== '') {
+                const val = ['1', 'true', 'si', 'sí', 'yes'].includes(String(requiere_talla).toLowerCase()) ? 1 : 0;
+                dotaciones = dotaciones.filter(d => Number(d.talla_requerida) === val);
+            }
+            if (id_categoria) {
+                dotaciones = dotaciones.filter(d => Number(d.id_categoria) === Number(id_categoria));
+            }
+
+            return res.json({
                 success: true,
                 data: dotaciones,
-                message: 'Dotaciones obtenidas correctamente'
+                total: dotaciones.length,
+                message: 'Catálogo de dotaciones obtenido correctamente'
             });
         } catch (error) {
-            console.error('Error al obtener dotaciones:', error);
-            res.status(500).json({
+            console.error('Error al obtener catálogo de dotaciones:', error);
+            return res.status(500).json({
                 success: false,
-                message: 'Error al obtener dotaciones',
+                message: 'Error al obtener catálogo de dotaciones',
                 error: error.message
             });
         }
     }
 
-    // Obtener todas las entregas con información detallada
+    // Obtener una dotación por ID (detallada)
+    static async getByIdItem(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) return res.status(400).json({ success: false, message: 'id es requerido' });
+            const item = await DotacionModel.getById(Number(id));
+            if (!item) return res.status(404).json({ success: false, message: 'Dotación no encontrada' });
+            return res.json({ success: true, data: item, message: 'Dotación obtenida correctamente' });
+        } catch (error) {
+            console.error('Error al obtener dotación:', error);
+            return res.status(500).json({ success: false, message: 'Error al obtener dotación', error: error.message });
+        }
+    }
+
+    // Crear nueva dotación (item)
+    static async createItem(req, res) {
+        try {
+            const {
+                nombre_dotacion,
+                descripcion = null,
+                talla_requerida = 0,
+                unidad_medida = null,
+                id_categoria,
+                id_proveedor,
+                precio_unitario
+            } = req.body || {};
+
+            if (!nombre_dotacion || !id_categoria || !id_proveedor || precio_unitario === undefined) {
+                return res.status(400).json({ success: false, message: 'Campos requeridos: nombre_dotacion, id_categoria, id_proveedor, precio_unitario' });
+            }
+
+            const insertId = await DotacionModel.create({
+                nombre_dotacion,
+                descripcion,
+                talla_requerida: Number(talla_requerida) ? 1 : 0,
+                unidad_medida,
+                id_categoria: Number(id_categoria),
+                id_proveedor: Number(id_proveedor),
+                precio_unitario: Number(precio_unitario)
+            });
+
+            // devolver el registro creado
+            const created = await DotacionModel.getById(insertId);
+            return res.status(201).json({ success: true, data: created, message: 'Dotación creada correctamente' });
+        } catch (error) {
+            console.error('Error al crear dotación:', error);
+            return res.status(500).json({ success: false, message: 'Error al crear dotación', error: error.message });
+        }
+    }
+
+    // Actualizar dotación (item)
+    static async updateItem(req, res) {
+        try {
+            const { id } = req.params;
+            const {
+                nombre_dotacion,
+                descripcion = null,
+                talla_requerida = 0,
+                unidad_medida = null,
+                id_categoria,
+                id_proveedor,
+                precio_unitario
+            } = req.body || {};
+
+            if (!id || !nombre_dotacion || !id_categoria || !id_proveedor || precio_unitario === undefined) {
+                return res.status(400).json({ success: false, message: 'Campos requeridos: id, nombre_dotacion, id_categoria, id_proveedor, precio_unitario' });
+            }
+
+            const ok = await DotacionModel.update(Number(id), {
+                nombre_dotacion,
+                descripcion,
+                talla_requerida: Number(talla_requerida) ? 1 : 0,
+                unidad_medida,
+                id_categoria: Number(id_categoria),
+                id_proveedor: Number(id_proveedor),
+                precio_unitario: Number(precio_unitario)
+            });
+
+            if (!ok) return res.status(404).json({ success: false, message: 'Dotación no encontrada' });
+            const updated = await DotacionModel.getById(Number(id));
+            return res.json({ success: true, data: updated, message: 'Dotación actualizada correctamente' });
+        } catch (error) {
+            console.error('Error al actualizar dotación:', error);
+            return res.status(500).json({ success: false, message: 'Error al actualizar dotación', error: error.message });
+        }
+    }
+
+    // Eliminar dotación (item)
+    static async deleteItem(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) return res.status(400).json({ success: false, message: 'id es requerido' });
+            const ok = await DotacionModel.delete(Number(id));
+            if (!ok) return res.status(404).json({ success: false, message: 'Dotación no encontrada' });
+            return res.json({ success: true, message: 'Dotación eliminada correctamente' });
+        } catch (error) {
+            console.error('Error al eliminar dotación:', error);
+            return res.status(500).json({ success: false, message: 'Error al eliminar dotación', error: error.message });
+        }
+    }
+
+    // Obtener todas las entregas con información detallada (modelo basado SOLO en entregadotacion)
     static async getEntregas(req, res) {
         try {
-            const sql = `
+            const { 
+                page = 1, 
+                limit = 10, 
+                search = '', 
+                area = '', 
+                estado = '',
+                fecha_desde = null,
+                fecha_hasta = null
+            } = req.query || {};
+
+            const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+            const limitNum = Math.max(parseInt(limit, 10) || 10, 1);
+            const offset = (pageNum - 1) * limitNum;
+
+            const where = [];
+            const params = [];
+            if (search && String(search).trim() !== '') {
+                const pattern = `%${String(search).trim()}%`;
+                where.push('(e.nombre LIKE ? OR e.apellido LIKE ? OR e.Identificacion LIKE ?)');
+                params.push(pattern, pattern, pattern);
+            }
+            if (area && String(area).trim() !== '') {
+                where.push('e.id_area = ?');
+                params.push(Number(area));
+            }
+            // Filtrar por rango de fechas si están presentes (ciclo activo)
+            if (fecha_desde && fecha_hasta) {
+                where.push('DATE(ed.fecha_entrega) BETWEEN ? AND ?');
+                params.push(fecha_desde, fecha_hasta);
+            }
+            // Filtro por estado (modelo entregadotacion: todas las entregas son 'entregado')
+            if (estado && String(estado).trim() !== '') {
+                const est = String(estado).trim().toLowerCase();
+                if (est !== 'entregado') {
+                    // Si se pide un estado distinto a 'entregado', no hay coincidencias en este modelo
+                    where.push('1 = 0');
+                }
+            }
+            const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+            // Total de grupos (empleado + fecha)
+            const countSql = `
+                SELECT COUNT(DISTINCT e.id_empleado) AS total
+                FROM empleado_ciclo ec
+                INNER JOIN empleado e ON ec.id_empleado = e.id_empleado
+                LEFT JOIN entregadotacion ed ON ed.id_empleado = e.id_empleado 
+                    AND DATE(ed.fecha_entrega) BETWEEN ? AND ?
+                WHERE ec.id_ciclo = ?
+                ${whereSql}`;
+            let total = 0;
+            try {
+                const [{ total: tot }] = await query(countSql, params);
+                total = Number(tot) || 0;
+            } catch (err) {
+                total = 0;
+            }
+
+            // Primero obtener el ciclo activo
+            const cicloActivoSql = `
+                SELECT id_ciclo, fecha_inicio_ventana, fecha_fin_ventana
+                FROM ciclo_dotacion
+                WHERE estado = 'activo'
+                AND CURDATE() BETWEEN fecha_inicio_ventana AND fecha_fin_ventana
+                ORDER BY fecha_entrega ASC LIMIT 1`;
+            
+            const [cicloActivo] = await query(cicloActivoSql);
+            
+            if (!cicloActivo) {
+                return res.json({ success: true, data: [], total: 0, message: 'No hay ciclo activo' });
+            }
+
+            const selectSql = `
                 SELECT 
-                    ed.id_entrega,
-                    CONCAT(e.nombre, ' ', e.apellido) as empleado_nombre,
+                    ec.id_empleado_ciclo AS id_entrega,
                     e.id_empleado,
-                    e.cargo,
-                    d.nombre_dotacion,
-                    d.id_dotacion,
-                    t.talla,
-                    t.tipo_articulo,
-                    ed.cantidad,
-                    ed.fecha_entrega,
-                    ed.observaciones,
-                    a.nombre_area as area_nombre,
-                    DATE_ADD(ed.fecha_entrega, INTERVAL 4 MONTH) as proxima_entrega,
-                    DATEDIFF(DATE_ADD(ed.fecha_entrega, INTERVAL 4 MONTH), CURDATE()) as dias_restantes,
+                    CONCAT(e.nombre, ' ', e.apellido) AS nombre_empleado,
+                    e.Identificacion AS documento,
+                    e.telefono AS telefono,
+                    e.cargo AS cargo,
+                    a.nombre_area AS nombre_area,
+                    u.nombre AS nombre_ubicacion,
+                    k2.id_kit AS id_kit,
+                    k2.nombre AS nombre_kit,
+                    COALESCE(edc.fecha_entrega, ec.fecha_asignacion) AS fecha_entrega,
+                    ec.observaciones,
                     CASE 
-                        WHEN DATEDIFF(DATE_ADD(ed.fecha_entrega, INTERVAL 4 MONTH), CURDATE()) < 0 THEN 'vencida'
-                        WHEN DATEDIFF(DATE_ADD(ed.fecha_entrega, INTERVAL 4 MONTH), CURDATE()) <= 30 THEN 'proxima'
-                        ELSE 'vigente'
-                    END as estado
-                FROM entregadotacion ed
-                INNER JOIN empleado e ON ed.id_empleado = e.id_empleado
-                INNER JOIN dotacion d ON ed.id_dotacion = d.id_dotacion
-                LEFT JOIN talla t ON ed.id_talla = t.id_talla
-                LEFT JOIN area a ON e.id_area = a.id_area
-                ORDER BY ed.fecha_entrega DESC
-            `;
-            
-            const entregas = await query(sql);
-            
-            res.json({
-                success: true,
-                data: entregas,
-                message: 'Entregas obtenidas correctamente'
-            });
+                        WHEN edc.id_entrega IS NOT NULL THEN 'entregado'
+                        WHEN ec.estado = 'en_proceso' THEN 'en proceso'
+                        ELSE 'procesado'
+                    END AS estado
+                FROM empleado_ciclo ec
+                INNER JOIN empleado e ON ec.id_empleado = e.id_empleado
+                INNER JOIN area a ON e.id_area = a.id_area
+                INNER JOIN ubicacion u ON e.id_ubicacion = u.id_ubicacion
+                LEFT JOIN kitdotacion k2 ON k2.id_area = e.id_area AND k2.activo = 1
+                INNER JOIN ciclo_dotacion cd ON ec.id_ciclo = cd.id_ciclo
+                LEFT JOIN entregadotacion edc ON edc.id_empleado = e.id_empleado 
+                    AND DATE(edc.fecha_entrega) BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana
+                WHERE ec.id_ciclo = ?
+                AND cd.estado = 'activo'
+                AND CURDATE() BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana
+                ${whereSql}
+                GROUP BY 
+                    ec.id_empleado_ciclo,
+                    e.id_empleado,
+                    e.nombre,
+                    e.apellido,
+                    e.Identificacion,
+                    e.telefono,
+                    e.cargo,
+                    a.nombre_area,
+                    u.nombre,
+                    k2.id_kit,
+                    k2.nombre,
+                    ed.fecha_entrega,
+                    ec.fecha_asignacion,
+                    ec.observaciones,
+                    ec.estado
+                ORDER BY fecha_entrega DESC
+                LIMIT ${limitNum} OFFSET ${offset}`;
+            let rows;
+            try {
+                // Solo necesitamos el id del ciclo activo
+                const allParams = [
+                    ...params,
+                    cicloActivo.id_ciclo
+                ];
+                rows = await query(selectSql, allParams);
+            } catch (selectErr) {
+                console.warn('[getEntregas] Fallback simple por error en SELECT principal:', selectErr && selectErr.message);
+                const fallbackSql = `
+                    SELECT 
+                        MIN(ed.id_entrega) AS id_entrega,
+                        e.id_empleado,
+                        MIN(CONCAT(e.nombre, ' ', e.apellido)) AS nombre_empleado,
+                        MIN(e.Identificacion) AS documento,
+                        NULL AS telefono,
+                        NULL AS cargo,
+                        NULL AS nombre_area,
+                        NULL AS nombre_ubicacion,
+                        NULL AS id_kit,
+                        NULL AS nombre_kit,
+                        DATE(ed.fecha_entrega) AS fecha_entrega,
+                        NULL AS observaciones,
+                        'entregado' AS estado,
+                        COUNT(*) AS items_count
+                    FROM entregadotacion ed
+                    INNER JOIN empleado e ON ed.id_empleado = e.id_empleado
+                    ${whereSql}
+                    GROUP BY e.id_empleado, DATE(ed.fecha_entrega)
+                    ORDER BY fecha_entrega DESC
+                    LIMIT ${limitNum} OFFSET ${offset}`;
+                rows = await query(fallbackSql, params);
+            }
+
+            return res.json({ success: true, data: rows, entregas: rows, total, message: 'Entregas obtenidas correctamente' });
         } catch (error) {
             console.error('Error al obtener entregas:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error al obtener entregas',
-                error: error.message
+            res.status(500).json({ success: false, message: 'Error al obtener entregas', error: error.message });
+        }
+    }
+
+    // Actualizar una entrega existente (modelo entregadotacion):
+    // Actualiza fecha/observaciones para todas las filas del mismo empleado y día del id base
+    static async updateEntrega(req, res) {
+        const connection = await getConnection();
+        try {
+            const { id } = req.params;
+            const { fecha_entrega, observaciones, estado } = req.body || {};
+
+            if (!id) {
+                return res.status(400).json({ success: false, message: 'id es requerido' });
+            }
+
+            if (!fecha_entrega && !observaciones && !estado) {
+                return res.status(400).json({ success: false, message: 'No hay datos para actualizar' });
+            }
+
+            // Validar que el estado sea válido
+            if (estado && !['procesado', 'en proceso', 'entregado'].includes(estado)) {
+                return res.status(400).json({ success: false, message: 'Estado no válido' });
+            }
+
+            await connection.beginTransaction();
+
+            // Obtener la entrega actual
+            const entrega = await query(
+                'SELECT * FROM empleado_ciclo WHERE id_empleado_ciclo = ?',
+                [Number(id)]
+            );
+
+            if (!entrega || entrega.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ success: false, message: 'Entrega no encontrada' });
+            }
+
+            // Construir actualización
+            const updates = [];
+            const values = [];
+            
+            if (fecha_entrega) {
+                updates.push('fecha_entrega = ?');
+                values.push(fecha_entrega);
+            }
+            
+            if (observaciones !== undefined) {
+                updates.push('observaciones = ?');
+                values.push(observaciones);
+            }
+            
+            if (estado) {
+                updates.push('estado = ?');
+                values.push(estado);
+            }
+
+            // Actualizar la entrega
+            const sql = `
+                UPDATE empleado_ciclo 
+                SET ${updates.join(', ')}, 
+                    fecha_actualizacion = NOW() 
+                WHERE id_empleado_ciclo = ?
+            `;
+            values.push(Number(id));
+            
+            await connection.query(sql, values);
+
+            // Registrar en historial
+            await connection.query(
+                `INSERT INTO historialmovimientos (
+                    tabla_modificada, 
+                    id_registro, 
+                    tipo_movimiento, 
+                    fecha_movimiento, 
+                    usuario_responsable, 
+                    detalle_cambio
+                ) VALUES (?, ?, ?, NOW(), ?, ?)`,
+                [
+                    'empleado_ciclo',
+                    Number(id),
+                    'UPDATE',
+                    'sistema',
+                    `Actualización de entrega: ${estado ? `Estado=${estado}, ` : ''}${fecha_entrega ? `Fecha=${fecha_entrega}` : ''}`
+                ]
+            );
+
+            await connection.commit();
+            return res.json({ 
+                success: true, 
+                message: 'Entrega actualizada correctamente',
+                data: {
+                    id_entrega: id,
+                    fecha_entrega,
+                    estado,
+                    observaciones
+                }
             });
+        } catch (error) {
+            await connection.rollback();
+            console.error('Error al actualizar entrega:', error);
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Error al actualizar entrega', 
+                error: error.message 
+            });
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Eliminar una entrega (grupo por empleado y fecha)
+    static async deleteEntrega(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) return res.status(400).json({ success: false, message: 'id es requerido' });
+
+            const base = await query('SELECT id_empleado, DATE(fecha_entrega) AS f FROM entregadotacion WHERE id_entrega = ? LIMIT 1', [Number(id)]);
+            if (!base || base.length === 0) return res.status(404).json({ success: false, message: 'Entrega no encontrada' });
+            const { id_empleado, f } = base[0];
+            await query('DELETE FROM entregadotacion WHERE id_empleado = ? AND DATE(fecha_entrega) = ?', [id_empleado, f]);
+            await query(`INSERT INTO historialmovimientos (tabla_modificada, id_registro, tipo_movimiento, fecha_movimiento, usuario_responsable, detalle_cambio)
+                         VALUES ('entregadotacion', ?, 'DELETE', NOW(), 'sistema', 'Entrega eliminada (grupo empleado/fecha)')`, [Number(id)]);
+            return res.json({ success: true, message: 'Entrega eliminada correctamente' });
+        } catch (error) {
+            console.error('Error al eliminar entrega:', error);
+            return res.status(500).json({ success: false, message: 'Error al eliminar entrega', error: error.message });
+        }
+    }
+
+    // Obtener items de una entrega (modelo entregadotacion)
+    static async getEntregaItems(req, res) {
+        try {
+            const { id } = req.params; // id_entrega base de un item del grupo
+            if (!id) return res.status(400).json({ success: false, message: 'id es requerido' });
+            // Tomar el registro base por id_entrega y traer todos los items de ese empleado en esa fecha
+            const base = await query('SELECT id_empleado, DATE(fecha_entrega) AS f FROM entregadotacion WHERE id_entrega = ? LIMIT 1', [Number(id)]);
+            if (!base || base.length === 0) {
+                return res.json({ success: true, data: [], message: 'Items no encontrados' });
+            }
+            const { id_empleado, f } = base[0];
+            const sql = `
+                SELECT ed.id_entrega, ed.id_dotacion, d.nombre_dotacion, ed.cantidad, ed.id_talla, t.talla, t.tipo_articulo
+                FROM entregadotacion ed
+                INNER JOIN dotacion d ON d.id_dotacion = ed.id_dotacion
+                LEFT JOIN talla t ON t.id_talla = ed.id_talla
+                WHERE ed.id_empleado = ? AND DATE(ed.fecha_entrega) = ?
+                ORDER BY d.nombre_dotacion`;
+            const items = await query(sql, [id_empleado, f]);
+            return res.json({ success: true, data: items, message: 'Items de entrega obtenidos correctamente' });
+        } catch (error) {
+            console.error('Error al obtener items de entrega:', error);
+            return res.status(500).json({ success: false, message: 'Error al obtener items de entrega', error: error.message });
         }
     }
 
@@ -501,24 +874,21 @@ class DotacionesController {
 
             const empleado = empleados[0];
             
-            // Obtener dotaciones que le corresponden según su área
-            const dotacionesSql = `
-                SELECT DISTINCT
-                    d.id_dotacion,
-                    d.nombre_dotacion,
-                    d.descripcion,
-                    d.talla_requerida,
-                    d.unidad_medida,
-                    c.nombre_categoria,
-                    p.nombre as proveedor_nombre
-                FROM dotacion d
-                LEFT JOIN categoriadotacion c ON d.id_categoria = c.id_categoria
-                LEFT JOIN proveedor p ON d.id_proveedor = p.id_proveedor
-                ORDER BY d.nombre_dotacion
-            `;
+            // Obtener solo el kit correspondiente al área del empleado (incluye metadata del kit)
+            const kitResult = await DotacionModel.getKitDotacionPorEmpleado(empleado.id_empleado);
+            // kitResult -> { kit: {...} , dotaciones: [...] }
+            const dotaciones = kitResult && kitResult.dotaciones ? kitResult.dotaciones : [];
+            const kitInfo = kitResult && kitResult.kit ? kitResult.kit : null;
             
-            const dotaciones = await query(dotacionesSql);
-            
+            // DEBUG: en desarrollo, loggear las dotaciones que vamos a devolver para este empleado
+            if (process.env.NODE_ENV !== 'production') {
+                try {
+                    console.log('[DotacionesController] empleado:', empleado.id_empleado, 'area:', empleado.id_area, 'dotaciones_disponibles_count:', (dotaciones || []).length, 'ids:', (dotaciones || []).map(d => d.id_dotacion));
+                } catch (dbg) {
+                    console.error('[DotacionesController] debug log error:', dbg && dbg.message);
+                }
+            }
+
             // Obtener tallas disponibles para el empleado (basado en su género)
             const tallasSql = `
                 SELECT DISTINCT
@@ -559,6 +929,7 @@ class DotacionesController {
                 success: true,
                 data: {
                     empleado,
+                    kit: kitInfo,
                     dotaciones_disponibles: dotaciones,
                     tallas_disponibles: tallas,
                     historial_entregas: historial
@@ -579,30 +950,45 @@ class DotacionesController {
     // Obtener KPIs para el dashboard
     static async getKpis(req, res) {
         try {
-            const kpisSql = `
+            // total_dotaciones y stock_total
+            const metaSql = `
                 SELECT 
-                    (SELECT COUNT(*) FROM dotacion) as total_dotaciones,
-                    (SELECT COUNT(*) FROM entregadotacion) as total_entregas,
-                    (SELECT COUNT(*) FROM entregadotacion 
-                     WHERE DATEDIFF(DATE_ADD(fecha_entrega, INTERVAL 4 MONTH), CURDATE()) <= 30
-                     AND DATEDIFF(DATE_ADD(fecha_entrega, INTERVAL 4 MONTH), CURDATE()) >= 0) as proximas_entregas,
-                    (SELECT SUM(cantidad) FROM stockdotacion WHERE cantidad > 0) as stock_total
+                    (SELECT COUNT(*) FROM dotacion) AS total_dotaciones,
+                    (SELECT SUM(cantidad) FROM stockdotacion WHERE cantidad > 0) AS stock_total
             `;
-            
-            const [kpis] = await query(kpisSql);
-            
-            res.json({
-                success: true,
-                data: kpis,
-                message: 'KPIs obtenidos correctamente'
-            });
+            const [meta] = await query(metaSql);
+
+            // KPIs basados solo en entregadotacion agrupado por empleado+fecha
+            const totalEntSql = `
+                SELECT COUNT(*) AS total
+                FROM (
+                    SELECT ed.id_empleado, DATE(ed.fecha_entrega) AS f
+                    FROM entregadotacion ed
+                    GROUP BY ed.id_empleado, DATE(ed.fecha_entrega)
+                ) t`;
+            const [{ total: total_entregas = 0 }] = await query(totalEntSql);
+
+            const proximasSql = `
+                SELECT COUNT(*) AS total
+                FROM (
+                    SELECT ed.id_empleado, DATE(ed.fecha_entrega) AS f
+                    FROM entregadotacion ed
+                    WHERE DATEDIFF(DATE_ADD(ed.fecha_entrega, INTERVAL 4 MONTH), CURDATE()) BETWEEN 0 AND 30
+                    GROUP BY ed.id_empleado, DATE(ed.fecha_entrega)
+                ) t`;
+            const [{ total: proximas_entregas = 0 }] = await query(proximasSql);
+
+            const kpis = {
+                total_dotaciones: Number(meta.total_dotaciones) || 0,
+                total_entregas: Number(total_entregas) || 0,
+                proximas_entregas: Number(proximas_entregas) || 0,
+                stock_total: Number(meta.stock_total) || 0
+            };
+
+            return res.json({ success: true, data: kpis, message: 'KPIs obtenidos correctamente' });
         } catch (error) {
             console.error('Error al obtener KPIs:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error al obtener KPIs',
-                error: error.message
-            });
+            return res.status(500).json({ success: false, message: 'Error al obtener KPIs', error: error.message });
         }
     }
 }

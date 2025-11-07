@@ -1,6 +1,66 @@
 const { query } = require('../config/database');
 
 class DotacionModel {
+    /**
+     * Obtener el kit de dotación correspondiente al área del empleado
+     * Devuelve un array con los artículos del kit (no prendas sueltas)
+     * @param {number} id_empleado
+     * @returns {Promise<Array>} Kit de dotación para el área del empleado
+     */
+    static async getKitDotacionPorEmpleado(id_empleado) {
+        // 1. Obtener el área del empleado
+        const areaSql = 'SELECT id_area FROM Empleado WHERE id_empleado = ?';
+        const [empleado] = await query(areaSql, [id_empleado]);
+        if (!empleado || !empleado.id_area) {
+            return [];
+        }
+        // 2. Buscar el kit asignado a esa área.
+        // Para mantener consistencia con /api/kits/area/:id_area preferimos
+        // buscar primero en la tabla `kitdotacion` por `id_area` (kit directo)
+        // y como fallback comprobar `arearolkit`.
+        let kitId = null;
+        const kitDirectSql = 'SELECT id_kit FROM kitdotacion WHERE id_area = ? AND activo = 1 LIMIT 1';
+        const [kitDirect] = await query(kitDirectSql, [empleado.id_area]);
+        if (kitDirect && kitDirect.id_kit) {
+            kitId = kitDirect.id_kit;
+        } else {
+            const kitAreaSql = 'SELECT id_kit FROM arearolkit WHERE id_area = ? LIMIT 1';
+            const [kitArea] = await query(kitAreaSql, [empleado.id_area]);
+            if (kitArea && kitArea.id_kit) {
+                kitId = kitArea.id_kit;
+            } else {
+                return [];
+            }
+        }
+        // Dev-only debug
+        if (process.env.NODE_ENV !== 'production') {
+            try { console.log('[DotacionModel] getKitDotacionPorEmpleado -> empleado area', empleado.id_area, 'selected kitId:', kitId); } catch(e){}
+        }
+        // 3. Obtener metadata del kit
+        const kitMetaSql = `
+            SELECT id_kit, nombre as nombre_kit, id_area, activo
+            FROM kitdotacion
+            WHERE id_kit = ?
+            LIMIT 1
+        `;
+        const [kitMeta] = await query(kitMetaSql, [kitId]);
+
+        // 4. Obtener los artículos del kit (tabla detallekitdotacion)
+        const prendasSql = `
+            SELECT dkd.id_kit, dkd.id_dotacion, d.nombre_dotacion, d.descripcion, d.talla_requerida, d.unidad_medida, d.id_categoria, d.id_proveedor, d.precio_unitario, dkd.cantidad AS cantidad_en_kit
+            FROM detallekitdotacion dkd
+            INNER JOIN dotacion d ON dkd.id_dotacion = d.id_dotacion
+            WHERE dkd.id_kit = ?
+            ORDER BY d.nombre_dotacion
+        `;
+        const prendas = await query(prendasSql, [kitId]);
+
+        // Devolver un objeto con metadata del kit y la lista de dotaciones
+        return {
+            kit: kitMeta || null,
+            dotaciones: prendas || []
+        };
+    }
     // Obtener todas las dotaciones con información relacionada
     static async getAll() {
         const sql = `

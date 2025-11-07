@@ -9,6 +9,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'sirds_jwt_secret_key_2024';
  */
 const authMiddleware = async (req, res, next) => {
     try {
+        // Permitir preflight CORS sin exigir autenticación
+        if (req.method === 'OPTIONS') {
+            return res.sendStatus(204);
+        }
         const authHeader = req.headers['authorization'] || req.headers['Authorization'];
         if (!authHeader) {
             return res.status(401).json({ 
@@ -77,7 +81,9 @@ const authMiddleware = async (req, res, next) => {
         }
 
         // Normalizar nombre_rol a minúsculas (si existe) y adjuntar al request
-        req.user = payload;
+    // Exponer usuario tanto en req.user (estandar) como req.usuario (compatibilidad con controladores existentes)
+    req.user = payload;
+    req.usuario = payload;
         if (req.user.nombre_rol) {
             try { req.user.nombre_rol = req.user.nombre_rol.toString().toLowerCase(); } catch (e) { /* ignore */ }
         }

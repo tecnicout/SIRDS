@@ -10,6 +10,8 @@ const dbConfig = {
     user: process.env.DB_USER || process.env.DB_USERNAME || 'root',
     // Permitir DB_PASSWORD o DB_PASS según convenga al entorno
     password: process.env.DB_PASSWORD || process.env.DB_PASS || '',
+    // Nota: muchos dumps locales usan 'sirds' en minúsculas.
+    // Usamos 'SIRDS' por defecto pero haremos un fallback automático a 'sirds' si no existen tablas.
     database: process.env.DB_NAME || process.env.DB_DATABASE || 'SIRDS',
     waitForConnections: true,
     connectionLimit: process.env.DB_CONNECTION_LIMIT ? Number(process.env.DB_CONNECTION_LIMIT) : 10,
@@ -20,13 +22,45 @@ const dbConfig = {
 // si intentamos reconectar usando 127.0.0.1 como fallback)
 let pool = mysql.createPool(dbConfig);
 
+// Verificar si el esquema actual contiene las tablas esperadas; si no, intentar fallback a 'sirds'
+const ensureDatabaseCase = async () => {
+    try {
+        const [rows] = await pool.execute(
+            "SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'kitdotacion'"
+        );
+        const hasKitsTable = Array.isArray(rows) && rows[0] && Number(rows[0].cnt) > 0;
+        if (hasKitsTable) {
+            return true;
+        }
+
+        // Si no encuentra la tabla, verificar si existe el esquema 'sirds' (minúsculas)
+        const [schemas] = await pool.execute(
+            "SELECT SCHEMA_NAME AS name FROM information_schema.schemata WHERE SCHEMA_NAME IN ('sirds','SIRDS') ORDER BY CASE WHEN SCHEMA_NAME='sirds' THEN 0 ELSE 1 END"
+        );
+        const preferred = schemas.find(s => s.name.toLowerCase() === 'sirds');
+        if (preferred && preferred.name !== dbConfig.database) {
+            // Recrear pool apuntando a 'sirds'
+            const fallbackConfig = Object.assign({}, dbConfig, { database: preferred.name });
+            pool = mysql.createPool(fallbackConfig);
+            console.log(`🔁 Cambiando base de datos a '${preferred.name}' (fallback automático)`);
+            return true;
+        }
+        return false;
+    } catch (err) {
+        // No bloquear por esto
+        console.warn('Advertencia ensureDatabaseCase:', err.message);
+        return false;
+    }
+};
+
 // Función para probar la conexión
 const testConnection = async () => {
     // Intentar conectarse al pool actual
     try {
-        const connection = await pool.getConnection();
-        console.log('✅ Conexión a MySQL establecida correctamente (host:', dbConfig.host, ')');
-        connection.release();
+    const connection = await pool.getConnection();
+    console.log('✅ Conexión a MySQL establecida correctamente (host:', dbConfig.host, 'db:', dbConfig.database, ')');
+    connection.release();
+    await ensureDatabaseCase();
         return true;
     } catch (error) {
         // Log conciso del error inicial
@@ -100,9 +134,15 @@ const transaction = async (queries) => {
     }
 };
 
+// Función para obtener una conexión del pool
+const getConnection = async () => {
+    return await pool.getConnection();
+};
+
 module.exports = {
     pool,
     query,
     transaction,
+    getConnection,
     testConnection
 };

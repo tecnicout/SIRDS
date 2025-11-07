@@ -41,14 +41,8 @@ const ContadorProximaEntrega = () => {
   }
 
   if (!proximaEntrega) {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-        <div className="flex items-center space-x-2 text-green-700">
-          <i className="bx bx-check text-sm"></i>
-          <span className="text-sm font-medium">Sin entregas próximas</span>
-        </div>
-      </div>
-    );
+    // No mostrar nada cuando no hay entregas próximas
+    return null;
   }
 
   const { dias_restantes, empleado_nombre, nombre_dotacion } = proximaEntrega;

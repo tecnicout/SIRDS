@@ -12,10 +12,31 @@ const PORT = process.env.PORT || 3001;
 
 // Middlewares de seguridad
 app.use(helmet());
-app.use(cors({
-    origin: ['http://localhost:3001', 'http://localhost:5173'],
-    credentials: true
-}));
+
+// --- CORS CONFIG REFACTORIZADO (incluye 5174 y FRONTEND_URL) ---
+const allowedOrigins = new Set([
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3001'
+]);
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.add(process.env.FRONTEND_URL);
+}
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true); // curl / same-origin / SSR
+        if (allowedOrigins.has(origin)) return callback(null, true);
+        return callback(new Error('Origen no permitido por CORS: ' + origin), false);
+    },
+    credentials: true,
+    methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization','Accept'],
+    optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Logging
 app.use(morgan('combined'));
@@ -43,9 +64,12 @@ const dotacionesChRoutes = require('./backend/routes/dotacionesChRoutes');
 const tallaRoutes = require('./backend/routes/tallaRoutes');
 const stockRoutes = require('./backend/routes/stockRoutes');
 const kitRoutes = require('./backend/routes/kitRoutes');
+const debugRoutes = require('./backend/routes/debugRoutes');
 const solicitudRoutes = require('./backend/routes/solicitudRoutes');
 const pedidoRoutes = require('./backend/routes/pedidoRoutes');
 const entregaRoutes = require('./backend/routes/entregaRoutes');
+const ciclosRoutes = require('./backend/routes/ciclosRoutes');
+const entregasCicloRoutes = require('./backend/routes/entregasRoutes');
 
 // Rutas API
 app.use('/api/auth', authRoutes);
@@ -62,9 +86,12 @@ app.use('/api/dotaciones_ch', dotacionesChRoutes);
 app.use('/api/tallas', tallaRoutes);
 app.use('/api/stock', stockRoutes);
 app.use('/api/kits', kitRoutes);
+app.use('/api/debug', debugRoutes);
 app.use('/api/solicitudes', solicitudRoutes);
 app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/entregas', entregaRoutes);
+app.use('/api/ciclos', ciclosRoutes);
+app.use('/api/entregas-ciclo', entregasCicloRoutes);
 
 // Manejo de errores global
 app.use((err, req, res, next) => {
