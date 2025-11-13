@@ -43,4 +43,7 @@ router.patch('/:id/activate', UsuarioController.activate);
 // Resetear contraseña (Solo Admin)
 router.patch('/:id/reset-password', UsuarioController.resetPassword);
 
+// Eliminar usuario (Solo Admin, y debe estar inactivo)
+router.delete('/:id', UsuarioController.delete);
+
 module.exports = router;

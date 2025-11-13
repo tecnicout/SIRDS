@@ -25,10 +25,15 @@
 
 /* Configuración base */
 @layer base {
+  html, body, #root {
+    overflow-x: hidden; /* Evita scroll horizontal global */
+    width: 100%;
+  }
+
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    /* Use the pale gold (primary-50) as global background so sections blend */
-    @apply bg-primary-50;
+    /* Fondo global: reemplaza dorado pálido por gris cálido */
+    background-color: #F5F2E8;
   /* Variables para tipografía */
   --font-heading: 'Rubik', system-ui, -apple-system, sans-serif;
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;

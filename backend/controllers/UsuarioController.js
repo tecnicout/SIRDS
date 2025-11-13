@@ -339,6 +339,69 @@ class UsuarioController {
     }
 
     /**
+     * Eliminar usuario definitivamente
+     * Reglas:
+     *  - Solo administradores (id_rol = 4)
+     *  - No se puede eliminar a sí mismo
+     *  - Debe estar inactivo antes de eliminar
+     */
+    static async delete(req, res) {
+        try {
+            const { id } = req.params;
+
+            if (Number(req.user.id_rol) !== 4) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Solo administradores pueden eliminar usuarios'
+                });
+            }
+
+            if (parseInt(id) === req.user.id_usuario) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No puedes eliminar tu propia cuenta'
+                });
+            }
+
+            // Verificar existencia y estado actual
+            const usuario = await UsuarioModel.getById(id);
+            if (!usuario) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Usuario no encontrado'
+                });
+            }
+
+            if (usuario.usuario_activo) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Debes desactivar el usuario antes de eliminarlo'
+                });
+            }
+
+            const eliminado = await UsuarioModel.delete(id, req.user.id_usuario);
+            if (eliminado) {
+                return res.json({
+                    success: true,
+                    message: 'Usuario eliminado correctamente'
+                });
+            }
+
+            return res.status(500).json({
+                success: false,
+                message: 'No se pudo eliminar el usuario'
+            });
+        } catch (error) {
+            console.error('Error al eliminar usuario:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error al eliminar usuario',
+                error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+            });
+        }
+    }
+
+    /**
      * Resetear contraseña de usuario
      * Solo administradores pueden resetear contraseñas
      */

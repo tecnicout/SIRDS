@@ -3,6 +3,8 @@ import DataTable from '../components/DataTable/DataTable';
 import Modal from '../components/Modal/Modal';
 import EditModal from '../components/Modal/EditModal';
 import ConfirmModal from '../components/Modal/ConfirmModal';
+import ResourceHeader from '../components/UI/ResourceHeader';
+import CardPanel from '../components/UI/CardPanel';
 
 // Configuración de columnas para la tabla de proveedores
 const PROVEEDORES_COLUMNS = [
@@ -401,7 +403,7 @@ export default function Proveedores() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 w-full space-y-6">
       {/* Toast Notification */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg ${
@@ -411,57 +413,41 @@ export default function Proveedores() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Proveedores</h1>
-          <p className="text-gray-600">Administra los proveedores del sistema</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          {/* Toggle para mostrar inactivos */}
-          <label className="flex items-center space-x-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={mostrarInactivos}
-              onChange={(e) => {
-                setMostrarInactivos(e.target.checked);
-                cargarProveedores(e.target.checked);
-              }}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span>Mostrar inactivos</span>
-          </label>
-          
-          {/* Botón crear proveedor */}
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-gradient-to-r from-[#B39237] to-[#D4AF37] hover:from-[#A0812F] hover:to-[#C19B2F] text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200"
-          >
-            <i className="bx bx-plus text-lg"></i>
-            <span>Nuevo Proveedor</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Tabla de Proveedores */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        {/* Header con información */}
-        {!isLoading && (
-          <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
-            <div className="flex justify-between items-center text-sm text-gray-600">
-              <span>
-                {proveedores.length} proveedor{proveedores.length !== 1 ? 'es' : ''} 
-                {mostrarInactivos ? ' (incluyendo inactivos)' : ' activos'}
-              </span>
-              {mostrarInactivos && (
-                <span className="text-blue-600">
-                  💡 Los proveedores inactivos tienen un botón verde para reactivar
-                </span>
-              )}
-            </div>
+      <ResourceHeader
+        title="Gestión de Proveedores"
+        subtitle="Administra los proveedores del sistema"
+        stats={[
+          { icon: 'bx-store', label: 'Total', value: proveedores.length },
+          { icon: 'bx-toggle-left', label: mostrarInactivos ? 'Vista' : 'Activos', value: mostrarInactivos ? 'Todos' : proveedores.filter(p=>Boolean(p.activo)).length },
+        ]}
+        action={(
+          <div className="flex items-center gap-4">
+            <label className="flex items-center text-xs text-[#6F581B] bg-white/70 px-3 py-2 rounded-lg ring-1 ring-[#E2BE69]/40">
+              <input
+                type="checkbox"
+                checked={mostrarInactivos}
+                onChange={(e) => { setMostrarInactivos(e.target.checked); cargarProveedores(e.target.checked); }}
+                className="mr-2 h-4 w-4 text-[#B39237] focus:ring-[#B39237] border-[#E2BE69] rounded"
+              />
+              Mostrar inactivos
+            </label>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-[#D4AF37] to-[#B39237] hover:from-[#B39237] hover:to-[#9C7F2F] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[#E2BE69] focus:ring-offset-2"
+            >
+              <i className="bx bx-plus"></i>
+              Nuevo Proveedor
+            </button>
           </div>
         )}
-        
+      />
+
+      <CardPanel title="Listado de Proveedores" icon="bx-spreadsheet" actions={null}>
+        {!isLoading && (
+          <div className="px-2 pb-3 text-sm text-[#7A6B46]">
+            {proveedores.length} proveedor{proveedores.length !== 1 ? 'es' : ''} {mostrarInactivos ? '(incluye inactivos)' : 'activos'}
+          </div>
+        )}
         <DataTable
           columns={PROVEEDORES_COLUMNS}
           data={proveedores}
@@ -479,7 +465,7 @@ export default function Proveedores() {
             </div>
           }
         />
-      </div>
+      </CardPanel>
 
       {/* Modal para crear proveedor */}
       <EditModal

@@ -70,6 +70,7 @@ const pedidoRoutes = require('./backend/routes/pedidoRoutes');
 const entregaRoutes = require('./backend/routes/entregaRoutes');
 const ciclosRoutes = require('./backend/routes/ciclosRoutes');
 const entregasCicloRoutes = require('./backend/routes/entregasRoutes');
+const reportesRoutes = require('./backend/routes/reportesRoutes');
 
 // Rutas API
 app.use('/api/auth', authRoutes);
@@ -92,6 +93,7 @@ app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/entregas', entregaRoutes);
 app.use('/api/ciclos', ciclosRoutes);
 app.use('/api/entregas-ciclo', entregasCicloRoutes);
+app.use('/api/reportes', reportesRoutes);
 
 // Manejo de errores global
 app.use((err, req, res, next) => {

@@ -22,4 +22,10 @@ router.get('/estadisticas/:id_ciclo',
     EntregasController.obtenerEstadisticas
 );
 
+// Resync kits for a cycle (assign missing id_kit)
+router.post('/resync/:id_ciclo/kits',
+    hasRole(['almacen','admin']),
+    EntregasController.resyncKits
+);
+
 module.exports = router;

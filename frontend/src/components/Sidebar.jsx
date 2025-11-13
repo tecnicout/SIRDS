@@ -200,16 +200,16 @@ function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
           </li>
           <li>
             <Link 
-              to="/solicitudes" 
+              to="/pedidos" 
               className={`flex items-center px-3 py-3 rounded-lg transition-colors ${
-                isActive('/solicitudes') 
+                isActive('/pedidos') 
                   ? 'bg-gradient-to-r from-[#B39237] to-[#D4AF37] text-white' 
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               } ${collapsed ? 'justify-center' : 'space-x-3'}`}
-              title={collapsed ? 'Solicitudes' : ''}
+              title={collapsed ? 'Pedidos' : ''}
             >
-              <i className="bx bx-clipboard text-xl"></i>
-              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Solicitudes</span>
+              <i className="bx bx-notepad text-xl"></i>
+              <span className={`transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>Pedidos</span>
             </Link>
           </li>
           <li>

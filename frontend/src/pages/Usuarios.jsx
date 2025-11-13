@@ -1,26 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import DataTable from '../components/DataTable/DataTable';
 import { ViewModal, EditModal } from '../components/Modal';
+import ResourceHeader from '../components/UI/ResourceHeader';
+import CardPanel from '../components/UI/CardPanel';
 
 // Configuración de columnas para la tabla de usuarios
 const USUARIOS_COLUMNS = [
   {
     key: 'username',
     label: 'Usuario',
+    icon: 'bx-user',
     sortable: true,
     render: (value, row) => (
       <div className="flex items-center">
         <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-          <span className="text-green-600 font-medium text-sm">
+          <span className="text-green-600 font-medium text-sm flex items-center gap-1">
+            <i className="bx bx-user"></i>
             {value?.charAt(0)?.toUpperCase() || 'U'}
           </span>
         </div>
         <div className="ml-4">
           <div className="text-sm font-medium text-gray-900">
-            {value}
+            <i className="bx bx-user text-gray-400 mr-1"></i>{value}
           </div>
           <div className="text-sm text-gray-500">
-            {row.email_usuario}
+            <i className="bx bx-envelope mr-1"></i>{row.email_usuario}
           </div>
         </div>
       </div>
@@ -29,14 +33,15 @@ const USUARIOS_COLUMNS = [
   {
     key: 'empleado_info',
     label: 'Empleado',
+    icon: 'bx-id-card',
     sortable: true,
     render: (value, row) => (
       <div>
         <div className="text-sm font-medium text-gray-900">
-          {row.nombre} {row.apellido}
+          <i className="bx bx-user-pin text-[#B39237] mr-1"></i>{row.nombre} {row.apellido}
         </div>
         <div className="text-sm text-gray-500">
-          {row.cargo}
+          <i className="bx bx-briefcase-alt mr-1"></i>{row.cargo}
         </div>
       </div>
     )
@@ -44,6 +49,7 @@ const USUARIOS_COLUMNS = [
       {
         key: 'nombre_rol',
         label: 'Rol Sistema',
+        icon: 'bx-shield-quarter',
         sortable: true,
         render: (value, row) => {
           // Normalize value to lowercase for matching backend role keys
@@ -63,11 +69,27 @@ const USUARIOS_COLUMNS = [
             }
           };
 
+          const getRolIcon = (rol) => {
+            switch (rol) {
+              case 'administrador':
+                return 'bx-crown';
+              case 'recursos_humanos':
+                return 'bx-group';
+              case 'almacen':
+                return 'bx-archive';
+              case 'compras':
+                return 'bx-cart';
+              default:
+                return 'bx-user';
+            }
+          };
+
           // Display a human-friendly label (capitalize words)
           const displayLabel = value ? value.toString().replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Sin rol';
           
           return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRolBadgeColor(rolKey)}`}>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getRolBadgeColor(rolKey)}`}>
+              <i className={`bx ${getRolIcon(rolKey)} text-sm`}></i>
               {displayLabel}
             </span>
           );
@@ -76,13 +98,15 @@ const USUARIOS_COLUMNS = [
   {
     key: 'usuario_activo',
     label: 'Estado',
+    icon: 'bx-toggle-left',
     align: 'center',
     render: (value, row) => (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
         value 
           ? 'bg-green-100 text-green-800' 
           : 'bg-red-100 text-red-800'
       }`}>
+        <i className={`bx ${value ? 'bx-check-circle' : 'bx-x-circle'} text-sm`}></i>
         {value ? 'Activo' : 'Inactivo'}
       </span>
     )
@@ -90,9 +114,11 @@ const USUARIOS_COLUMNS = [
   {
     key: 'ultimo_acceso',
     label: 'Último Acceso',
+    icon: 'bx-time-five',
     sortable: true,
     render: (value, row) => (
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-gray-500 flex items-center gap-1">
+        <i className="bx bx-time-five"></i>
         {value 
           ? new Date(value).toLocaleDateString('es-ES', {
               year: 'numeric',
@@ -365,22 +391,35 @@ export default function Usuarios() {
   });
 
   // Manejar acciones de fila del DataTable
+  // Estado para acción en proceso por fila (toggle/reset/etc.)
+  const [processingRowId, setProcessingRowId] = useState(null);
+
   const handleRowAction = (action, usuario) => {
+    if (!usuario) return;
+    if (processingRowId && processingRowId === usuario.id_usuario) return; // evita doble clic
     switch (action) {
-      case 'view':
+      case 'view': {
         setSelectedUser(usuario);
         setShowViewModal(true);
         break;
-      case 'edit':
+      }
+      case 'edit': {
         setEditingUser(usuario);
         setShowEditModal(true);
         break;
-      case 'toggle':
+      }
+      case 'toggle': {
         handleToggleStatus(usuario);
         break;
-      case 'reset':
+      }
+      case 'delete': {
+        handleDeleteUsuario(usuario);
+        break;
+      }
+      case 'reset': {
         handleResetPassword(usuario);
         break;
+      }
       default:
         break;
     }
@@ -388,12 +427,15 @@ export default function Usuarios() {
 
   // Función para cambiar estado del usuario
   const handleToggleStatus = async (usuario) => {
+    setProcessingRowId(usuario.id_usuario);
+    // Optimista: reflejar cambio inmediato
+    const previo = usuario.usuario_activo;
+    setUsuarios(prev => prev.map(u => u.id_usuario === usuario.id_usuario ? { ...u, usuario_activo: !previo } : u));
     try {
       const token = localStorage.getItem('token');
-      const endpoint = usuario.usuario_activo 
+      const endpoint = previo 
         ? `/api/usuarios/${usuario.id_usuario}/deactivate`
         : `/api/usuarios/${usuario.id_usuario}/activate`;
-      
       const response = await fetch(endpoint, {
         method: 'PATCH',
         headers: {
@@ -403,21 +445,29 @@ export default function Usuarios() {
       });
 
       if (response.ok) {
-        await cargarUsuarios();
-        showToast(`Usuario ${usuario.usuario_activo ? 'desactivado' : 'activado'} correctamente`, 'success');
+        // Refrescar usuarios y estadísticas para consistencia
+        await Promise.all([cargarUsuarios(), cargarEstadisticas()]);
+        showToast(`Usuario ${previo ? 'desactivado' : 'activado'} correctamente`, 'success');
         setError('');
       } else {
         const result = await response.json();
+        // Revertir optimista
+        setUsuarios(prev => prev.map(u => u.id_usuario === usuario.id_usuario ? { ...u, usuario_activo: previo } : u));
         showToast(result.message || 'Error al cambiar estado del usuario', 'error');
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error toggle usuario:', error);
+      // Revertir optimista
+      setUsuarios(prev => prev.map(u => u.id_usuario === usuario.id_usuario ? { ...u, usuario_activo: previo } : u));
       showToast('Error de conexión', 'error');
+    } finally {
+      setProcessingRowId(null);
     }
   };
 
   // Función para resetear contraseña
   const handleResetPassword = async (usuario) => {
+    if (processingRowId) return;
     if (!window.confirm(`¿Estás seguro de que quieres resetear la contraseña de ${usuario.username}?`)) {
       return;
     }
@@ -428,6 +478,7 @@ export default function Usuarios() {
       return;
     }
 
+    setProcessingRowId(usuario.id_usuario);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/usuarios/${usuario.id_usuario}/reset-password`, {
@@ -449,6 +500,79 @@ export default function Usuarios() {
     } catch (error) {
       console.error('Error:', error);
       showToast('Error de conexión', 'error');
+    } finally {
+      setProcessingRowId(null);
+    }
+  };
+
+  // Eliminar usuario definitivamente (requiere inactivo)
+  const handleDeleteUsuario = async (usuario) => {
+    if (processingRowId) return;
+
+    // Si está activo, ofrecer desactivar y eliminar en cadena
+    if (usuario.usuario_activo) {
+      const confirmDeactivate = window.confirm(`El usuario "${usuario.username}" está activo. ¿Deseas desactivarlo y eliminarlo?`);
+      if (!confirmDeactivate) return;
+      try {
+        setProcessingRowId(usuario.id_usuario);
+        const token = localStorage.getItem('token');
+        // 1) Desactivar
+        const deact = await fetch(`/api/usuarios/${usuario.id_usuario}/deactivate`, {
+          method: 'PATCH',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!deact.ok) {
+          const res = await deact.json().catch(()=>({}));
+          showToast(res.message || 'No se pudo desactivar el usuario', 'error');
+          setProcessingRowId(null);
+          return;
+        }
+        // 2) Eliminar
+        const del = await fetch(`/api/usuarios/${usuario.id_usuario}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const delRes = await del.json().catch(()=>({}));
+        if (del.ok && delRes?.success !== false) {
+          await Promise.all([cargarUsuarios(), cargarEstadisticas()]);
+          showToast(delRes.message || 'Usuario eliminado correctamente', 'success');
+        } else {
+          showToast(delRes.message || 'No se pudo eliminar el usuario', 'error');
+        }
+      } catch (err) {
+        console.error('Error al desactivar/eliminar usuario:', err);
+        showToast('Error de conexión', 'error');
+      } finally {
+        setProcessingRowId(null);
+      }
+      return;
+    }
+
+    // Si ya está inactivo, confirmar eliminación directa
+    if (!window.confirm(`¿Eliminar definitivamente al usuario "${usuario.username}"? Esta acción no se puede deshacer.`)) return;
+
+    try {
+      setProcessingRowId(usuario.id_usuario);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/usuarios/${usuario.id_usuario}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result?.success !== false) {
+        await Promise.all([cargarUsuarios(), cargarEstadisticas()]);
+        showToast(result.message || 'Usuario eliminado correctamente', 'success');
+      } else {
+        showToast(result.message || 'No se pudo eliminar el usuario', 'error');
+      }
+    } catch (err) {
+      console.error('Error al eliminar usuario:', err);
+      showToast('Error de conexión', 'error');
+    } finally {
+      setProcessingRowId(null);
     }
   };
 
@@ -553,23 +677,26 @@ export default function Usuarios() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Usuarios</h1>
-          <p className="text-gray-600">Administra los usuarios del sistema SIRDS</p>
-        </div>
-        <button
-          onClick={handleNewUser}
-          className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-5 py-2.5 font-medium transition-all duration-200 flex items-center gap-2 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Nuevo Usuario
-        </button>
-      </div>
+    <div className="p-6 w-full">
+      <ResourceHeader
+        title="Gestión de Usuarios"
+        subtitle="Administra los usuarios del sistema SIRDS"
+        stats={stats ? [
+          { icon: 'bx-group', label: 'Total', value: stats.total_usuarios },
+          { icon: 'bx-toggle-left', label: 'Activos', value: stats.usuarios_activos },
+          { icon: 'bx-shield-quarter', label: 'Admins', value: stats.administradores },
+          { icon: 'bx-time', label: 'Último Mes', value: stats.activos_ultimo_mes }
+        ] : []}
+        action={(
+          <button
+            onClick={handleNewUser}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#D4AF37] to-[#B39237] hover:from-[#B39237] hover:to-[#9C7F2F] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[#E2BE69] focus:ring-offset-2"
+          >
+            <i className="bx bx-user-plus"></i>
+            Nuevo Usuario
+          </button>
+        )}
+      />
 
       {/* Mensajes de error */}
       {error && (
@@ -578,85 +705,10 @@ export default function Usuarios() {
         </div>
       )}
 
-      {/* Estadísticas rápidas */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.total_usuarios}
-                </p>
-                <p className="text-gray-600 text-sm">
-                  Total Usuarios
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.usuarios_activos}
-                </p>
-                <p className="text-gray-600 text-sm">
-                  Activos
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.administradores}
-                </p>
-                <p className="text-gray-600 text-sm">
-                  Administradores
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.activos_ultimo_mes}
-                </p>
-                <p className="text-gray-600 text-sm">
-                  Último Mes
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Eliminado bloque duplicado de estadísticas rápidas: los valores ya se muestran en ResourceHeader */}
 
       {/* Filtros adicionales para usuarios */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+      <CardPanel title="Filtros" icon="bx-filter-alt">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -685,80 +737,42 @@ export default function Usuarios() {
             </button>
           </div>
         </div>
-      </div>
+      </CardPanel>
 
-      {/* DataTable */}
-      <DataTable
-        columns={USUARIOS_COLUMNS}
-        data={usuariosFiltrados}
-        rowKey="id_usuario"
-        loading={isLoading}
-        error={error}
-        searchQuery={searchQuery}
-        onSearch={setSearchQuery}
-        searchPlaceholder="Buscar por usuario, nombre, email..."
-        onRowAction={handleRowAction}
-        actions={[
-          {
-            label: 'Ver',
-            action: 'view',
+      <CardPanel title="Usuarios" icon="bx-id-card">
+        <DataTable
+          columns={USUARIOS_COLUMNS}
+          data={usuariosFiltrados}
+          rowKey="id_usuario"
+          loading={isLoading}
+          error={error}
+          searchQuery={searchQuery}
+          onSearch={setSearchQuery}
+          searchPlaceholder="Buscar por usuario, nombre, email..."
+          onRowAction={handleRowAction}
+          // Usamos acciones estándar del DataTable: view, edit y toggle (personalizada), sin delete
+          rowActions={[ 'view', 'edit', 'toggle', 'delete', 'reset' ]}
+          getProcessingAction={(row) => processingRowId === row.id_usuario ? 'toggle' : null}
+          getDisabledActions={(row) => {
+            const disabled = [];
+            if (processingRowId === row.id_usuario) disabled.push('toggle','reset','edit','delete');
+            return disabled;
+          }}
+          emptyState={{
             icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
               </svg>
             ),
-            className: 'text-blue-600 hover:text-blue-900'
-          },
-          {
-            label: 'Editar',
-            action: 'edit',
-            icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            ),
-            className: 'text-green-600 hover:text-green-900'
-          },
-          {
-            label: (row) => row.usuario_activo ? 'Desactivar' : 'Activar',
-            action: 'toggle',
-            icon: (row) => row.usuario_activo ? (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            ),
-            className: (row) => row.usuario_activo ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
-          },
-          {
-            label: 'Reset Password',
-            action: 'reset',
-            icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2m-2-2a2 2 0 00-2 2m2-2V5a2 2 0 00-2-2H9a2 2 0 00-2 2v2m0 0a2 2 0 00-2 2m2-2a2 2 0 012 2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            ),
-            className: 'text-orange-600 hover:text-orange-900'
-          }
-        ]}
-        emptyState={{
-          icon: (
-            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-            </svg>
-          ),
-          title: 'No hay usuarios disponibles',
-          description: searchQuery || rolFiltro ? 'No se encontraron usuarios que coincidan con los filtros' : 'Comience creando un nuevo usuario',
-          action: {
-            label: 'Crear Primer Usuario',
-            onClick: handleNewUser
-          }
-        }}
-      />
+            title: 'No hay usuarios disponibles',
+            description: searchQuery || rolFiltro ? 'No se encontraron usuarios que coincidan con los filtros' : 'Comience creando un nuevo usuario',
+            action: {
+              label: 'Crear Primer Usuario',
+              onClick: handleNewUser
+            }
+          }}
+        />
+      </CardPanel>
 
       {/* Modal de Vista */}
       <ViewModal

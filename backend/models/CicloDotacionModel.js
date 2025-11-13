@@ -217,42 +217,73 @@ class CicloDotacionModel {
         [estado, id_ciclo]
       );
 
-      // Al activar: asignar empleados elegibles automáticamente
+      // Al activar: sincronizar elegibles (NO insertar a todos los empleados)
       if (estado === 'activo') {
-        // Procesar empleados usando la misma conexión
-        const [empleadosElegibles] = await connection.query(`
-          SELECT e.*, a.id_area, k.id_kit
-          FROM empleado e
-          INNER JOIN area a ON e.id_area = a.id_area
-          INNER JOIN kitdotacion k ON k.id_area = a.id_area AND k.activo = 1
-          WHERE e.estado = 1 
-          AND NOT EXISTS (
-            SELECT 1 FROM empleado_ciclo ec 
-            WHERE ec.id_empleado = e.id_empleado 
-            AND ec.id_ciclo = ?
-          )`, [id_ciclo]);
+        // 1) Obtener SMLV aplicado al ciclo o derivarlo por año de entrega
+        const [[cicloRow]] = await connection.query(
+          'SELECT valor_smlv_aplicado, fecha_entrega FROM ciclo_dotacion WHERE id_ciclo = ? LIMIT 1',
+          [id_ciclo]
+        );
 
-        for (const empleado of empleadosElegibles) {
-          await connection.query(`
-            INSERT INTO empleado_ciclo (
-              id_ciclo, 
-              id_empleado,
-              id_kit,
-              fecha_asignacion,
-              estado,
-              observaciones,
-              antiguedad_meses,
-              sueldo_al_momento,
-              id_area
-            ) VALUES (?, ?, ?, NOW(), 'procesado', 'Asignación automática por ciclo', 0, ?, ?)`,
-            [id_ciclo, empleado.id_empleado, empleado.id_kit, empleado.sueldo, empleado.id_area]
+        let smlvValor = Number.parseFloat(cicloRow?.valor_smlv_aplicado);
+        if (!Number.isFinite(smlvValor)) {
+          // Derivar por tabla de salarios mínimos según el año de la fecha de entrega
+          const [[smlvRow]] = await connection.query(
+            'SELECT valor_mensual FROM salario_minimo WHERE anio = YEAR(?) LIMIT 1',
+            [cicloRow?.fecha_entrega || new Date()]
           );
+          smlvValor = Number.parseFloat(smlvRow?.valor_mensual);
         }
 
+        if (!Number.isFinite(smlvValor)) {
+          throw new Error('No se pudo determinar el SMLV aplicado para reactivar el ciclo');
+        }
+
+        // 2) Insertar SOLO elegibles que aún no estén en el ciclo (antigüedad >=3m, sueldo <= 2 SMLV)
+        const [insertRes] = await connection.execute(
+          `INSERT INTO empleado_ciclo (
+              id_ciclo, id_empleado, id_kit, estado, antiguedad_meses, sueldo_al_momento, id_area
+           )
+           SELECT ?, e.id_empleado, k.id_kit, 'procesado',
+                  TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses,
+                  e.sueldo, e.id_area
+           FROM empleado e
+           INNER JOIN area a ON e.id_area = a.id_area
+           LEFT JOIN kitdotacion k ON k.id_area = a.id_area AND k.activo = 1
+           WHERE e.estado = 1
+             AND e.sueldo > 0
+             AND TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) >= 3
+             AND e.sueldo <= (? * 2)
+             AND NOT EXISTS (
+                SELECT 1 FROM empleado_ciclo ec
+                WHERE ec.id_ciclo = ? AND ec.id_empleado = e.id_empleado
+             )`,
+          [id_ciclo, smlvValor, id_ciclo]
+        );
+
+        // 3) Backfill de kits por área para registros con id_kit NULL
+        await connection.execute(
+          `UPDATE empleado_ciclo ec
+           INNER JOIN kitdotacion k ON k.id_area = ec.id_area AND k.activo = 1
+           SET ec.id_kit = k.id_kit
+           WHERE ec.id_ciclo = ? AND ec.id_kit IS NULL`,
+          [id_ciclo]
+        );
+
+        // 4) Actualizar total de empleados en el ciclo con un COUNT real
+        const [[{ total }]] = await connection.query(
+          'SELECT COUNT(*) AS total FROM empleado_ciclo WHERE id_ciclo = ?',
+          [id_ciclo]
+        );
         await connection.query(
           'UPDATE ciclo_dotacion SET total_empleados_elegibles = ? WHERE id_ciclo = ?',
-          [empleadosElegibles.length, id_ciclo]
+          [Number(total || 0), id_ciclo]
         );
+
+        // Log suave para diagnóstico
+        try {
+          console.log('[updateEstado] Ciclo reactivado', id_ciclo, 'SMLV=', smlvValor, 'insertados=', Number(insertRes?.affectedRows || 0), 'total=', Number(total || 0));
+        } catch (_) { /* noop */ }
       }
 
       // Al cerrar: no se eliminan asignaciones, solo se marca estado. (Posible hook futuro)
@@ -349,7 +380,11 @@ class CicloDotacionModel {
           CASE 
             WHEN CURDATE() BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana THEN TRUE
             ELSE FALSE
-          END as en_ventana
+          END as en_ventana,
+          (SELECT COUNT(*) FROM empleado_ciclo WHERE id_ciclo = cd.id_ciclo) as total_empleados,
+          (SELECT COUNT(*) FROM empleado_ciclo WHERE id_ciclo = cd.id_ciclo AND estado = 'procesado') as procesados,
+          (SELECT COUNT(*) FROM empleado_ciclo WHERE id_ciclo = cd.id_ciclo AND estado = 'entregado') as entregados,
+          (SELECT COUNT(*) FROM empleado_ciclo WHERE id_ciclo = cd.id_ciclo AND estado = 'omitido') as omitidos
         FROM ciclo_dotacion cd
         WHERE cd.estado = 'activo'
           AND CURDATE() BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana
@@ -385,27 +420,61 @@ class CicloDotacionModel {
   }
 
   /**
-   * Eliminar ciclo (solo si no tiene empleados asignados)
+   * Eliminar ciclo (permitido si NO hay entregas u omisiones registradas)
+   * Regla: Se puede eliminar un ciclo en estado no-activo siempre que no existan
+   * registros de empleado_ciclo en estado 'entregado' u 'omitido'.
+   * Si solo hay 'procesado', se eliminan primero esas asignaciones y luego el ciclo.
    */
-  static async delete(id_ciclo) {
+  static async delete(id_ciclo, { force = false } = {}) {
+    const connection = await getConnection();
     try {
-      // Verificar que no tenga empleados
-      const empleados = await query(
-        'SELECT COUNT(*) as total FROM empleado_ciclo WHERE id_ciclo = ?',
+      await connection.beginTransaction();
+
+      // 1) Verificar estados asociados al ciclo
+      const [[stats]] = await connection.query(
+        `SELECT 
+            SUM(CASE WHEN estado = 'entregado' THEN 1 ELSE 0 END) as entregados,
+            SUM(CASE WHEN estado = 'omitido' THEN 1 ELSE 0 END) as omitidos,
+            COUNT(*) as total
+         FROM empleado_ciclo
+         WHERE id_ciclo = ?`,
         [id_ciclo]
       );
 
-      if (empleados[0].total > 0) {
-        throw new Error('No se puede eliminar: el ciclo tiene empleados asignados');
+      try {
+        console.log('[CicloDotacionModel.delete] ciclo', id_ciclo, 'stats=', stats);
+      } catch(_) {}
+
+      const entregados = Number(stats?.entregados || 0);
+      const omitidos = Number(stats?.omitidos || 0);
+      const total = Number(stats?.total || 0);
+
+      if (entregados > 0 || omitidos > 0) {
+        if (!force) {
+          throw new Error('No se puede eliminar: el ciclo tiene entregas u omisiones registradas (use force=true para eliminar definitivamente)');
+        }
+        console.log('[CicloDotacionModel.delete] Force delete solicitado. Se eliminarán registros entregados/omitidos del ciclo', id_ciclo);
+        await connection.query('DELETE FROM empleado_ciclo WHERE id_ciclo = ?', [id_ciclo]);
       }
 
-      const result = await query(
-        'DELETE FROM ciclo_dotacion WHERE id_ciclo = ?',
-        [id_ciclo]
-      );
-      return result;
+      // 2) Si hay registros solo en estado 'procesado', eliminarlos primero
+      // Si no había entregados u omitidos pero sí procesados y no era force, ya hemos purgado más arriba solo en caso de force.
+      if (total > 0 && !(entregados > 0 || omitidos > 0)) {
+        console.log('[CicloDotacionModel.delete] Purga de registros procesados antes de eliminar ciclo', id_ciclo);
+        await connection.query('DELETE FROM empleado_ciclo WHERE id_ciclo = ?', [id_ciclo]);
+      }
+
+      // 3) Eliminar el ciclo
+      console.log('[CicloDotacionModel.delete] Eliminando ciclo', id_ciclo);
+      await connection.query('DELETE FROM ciclo_dotacion WHERE id_ciclo = ?', [id_ciclo]);
+
+      await connection.commit();
+      return { success: true };
     } catch (error) {
+      await connection.rollback();
       throw new Error(`Error al eliminar ciclo: ${error.message}`);
+    } finally {
+      connection.release();
     }
   }
 

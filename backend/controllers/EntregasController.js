@@ -33,6 +33,24 @@ class EntregasController {
     }
 
     /**
+     * Reasignar kits para registros de un ciclo que tienen id_kit NULL
+     * Útil cuando se crean kits después de haber creado el ciclo.
+     */
+    static async resyncKits(req, res) {
+        try {
+            const { id_ciclo } = req.params;
+            if (!id_ciclo) {
+                return res.status(400).json({ success: false, message: 'id_ciclo requerido' });
+            }
+            const afectados = await require('../models/EmpleadoCicloModel').backfillKitsPorArea(id_ciclo);
+            res.json({ success: true, message: 'Resincronización de kits completada', data: { id_ciclo, kits_asignados: afectados } });
+        } catch (error) {
+            console.error('Error al resincronizar kits:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    /**
      * Actualizar estado de una entrega
      */
     static async actualizarEstado(req, res) {

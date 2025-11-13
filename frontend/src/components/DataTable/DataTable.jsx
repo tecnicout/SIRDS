@@ -159,7 +159,7 @@ const DataTable = ({
       )}
       
       {/* Tabla */}
-      <div className="bg-white shadow border rounded-lg overflow-hidden">
+      <div className="bg-white shadow border rounded-xl overflow-hidden ring-1 ring-[#E2BE69]/30">
         {loading ? loadingState : error ? errorState : (
           filteredData.length === 0 ? (
             emptyState || defaultEmptyState
@@ -167,30 +167,29 @@ const DataTable = ({
             <div className="overflow-x-auto">
               <table className={`min-w-full divide-y divide-gray-200 ${tableClassName}`}>
                 {/* Encabezados */}
-                <thead className="bg-gray-50">
+                <thead className="bg-gradient-to-r from-white via-[#FFF8EC] to-white">
                   <tr>
                     {visibleColumns.map((column) => (
                       <th
                         key={column.key}
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                          column.sortable ? 'cursor-pointer hover:bg-gray-100' : ''
-                        } ${column.className || ''}`}
+                        className={`px-6 py-3 text-left text-xs font-semibold tracking-wide ${
+                          column.sortable ? 'cursor-pointer group' : ''
+                        } ${column.className || ''} bg-white/60 backdrop-blur-sm`}
                         style={{ width: column.width }}
                         onClick={() => column.sortable && handleSort(column.key)}
                       >
-                        <div className={`flex items-center ${column.align === 'center' ? 'justify-center' : column.align === 'right' ? 'justify-end' : 'justify-start'}`}>
-                          <span>{column.label}</span>
+                        <div className={`flex items-center text-[#6F581B] ${column.align === 'center' ? 'justify-center' : column.align === 'right' ? 'justify-end' : 'justify-start'}`}>
+                          <span className="flex items-center gap-1">
+                            {column.icon && <i className={`bx ${column.icon} text-[15px] text-[#B39237]`}></i>}
+                            {column.label}
+                          </span>
                           {column.sortable && (
                             <svg 
-                              className={`ml-1 h-4 w-4 ${
+                              className={`ml-1 h-4 w-4 transition-transform duration-200 ${
                                 sortConfig.key === column.key 
-                                  ? 'text-gray-700' 
-                                  : 'text-gray-400'
-                              } ${
-                                sortConfig.key === column.key && sortConfig.direction === 'desc' 
-                                  ? 'transform rotate-180' 
-                                  : ''
-                              }`}
+                                  ? 'text-[#B39237]' 
+                                  : 'text-[#C9B06A] group-hover:text-[#B39237]'
+                              } ${sortConfig.key === column.key && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
                               fill="none" 
                               stroke="currentColor" 
                               viewBox="0 0 24 24"
@@ -216,13 +215,13 @@ const DataTable = ({
                 </thead>
                 
                 {/* Cuerpo de la tabla */}
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-100">
                   {filteredData.map((row) => (
-                    <tr key={row[rowKey]} className="hover:bg-gray-50">
+                    <tr key={row[rowKey]} className="hover:bg-[#FFF9F0] transition-colors">
                       {visibleColumns.map((column) => (
                         <td
                           key={`${row[rowKey]}-${column.key}`}
-                          className={`px-6 py-4 whitespace-nowrap ${column.className || ''}`}
+                          className={`px-6 py-3 whitespace-nowrap text-sm text-gray-700 ${column.className || ''}`}
                           style={{ 
                             width: column.width,
                             textAlign: column.align || 'left'
@@ -234,7 +233,7 @@ const DataTable = ({
                       
                       {/* Celda de acciones */}
                       {(rowActions.length > 0 || customRowActions.length > 0) && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-6 py-3 whitespace-nowrap text-sm font-medium">
                           <TableRowActions
                             row={row}
                             onAction={onRowAction}

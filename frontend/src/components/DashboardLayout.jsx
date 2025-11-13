@@ -25,16 +25,17 @@ export default function DashboardLayout({ children, onLogout }) {
     onLogout
   }), [sidebarCollapsed, handleSidebarMouseEnter, handleSidebarMouseLeave, onLogout]);
 
-  const mainClassName = useMemo(() => 
-    `flex-1 p-6 transition-all duration-500 ease-in-out ${
-      sidebarCollapsed ? 'ml-16' : 'ml-64'
-    }`, [sidebarCollapsed]
-  );
+  // Evitar overflow horizontal: el sidebar es fixed, así que desplazamos el contenedor con padding-left
+  const containerClassName = useMemo(() => (
+    `pt-24 flex transition-all duration-500 ease-in-out ${sidebarCollapsed ? 'pl-16' : 'pl-64'}`
+  ), [sidebarCollapsed]);
+
+  const mainClassName = 'flex-1 p-6 min-w-0';
 
   return (
     <div className="min-h-screen bg-gray-50">
       <NavPrivada onLogout={onLogout} />
-      <div className="pt-24 flex">
+      <div className={containerClassName}>
         <Sidebar {...sidebarProps} />
         <main className={mainClassName}>
           {children}

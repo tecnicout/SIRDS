@@ -1,6 +1,7 @@
 const CicloDotacionModel = require('../models/CicloDotacionModel');
 const EmpleadoCicloModel = require('../models/EmpleadoCicloModel');
 const SalarioMinimoModel = require('../models/SalarioMinimoModel');
+const { query } = require('../config/database');
 
 class CiclosController {
   /**
@@ -69,8 +70,8 @@ class CiclosController {
       const {
         nombre_ciclo,
         fecha_entrega,
-        id_area_produccion = 1, // Por defecto área Producción
-        id_area_mercadista = 22, // Por defecto área Mercadista
+        id_area_produccion = 1, // Compatibilidad, ya no limita elegibles
+        id_area_mercadista = 22, // Compatibilidad, ya no limita elegibles
         observaciones
       } = req.body;
 
@@ -110,12 +111,17 @@ class CiclosController {
         });
       }
 
-      // Calcular empleados elegibles
-      const empleadosElegibles = await EmpleadoCicloModel.calcularElegibles(
-        id_area_produccion,
-        id_area_mercadista,
-        parseFloat(smlv.valor_mensual)
-      );
+      // Calcular empleados elegibles (GLOBAL): antigüedad >= 3 meses y sueldo <= 2 SMLV
+      const smlvValor = parseFloat(smlv.valor_mensual);
+      const empleadosElegibles = await EmpleadoCicloModel.calcularElegiblesGlobal(smlvValor);
+
+      // Si hay elegibles en preview pero llegan 0 aquí, log comparativo
+      try {
+        console.log('[crearCiclo] Preview/Elegibles count esperado (global) =', empleadosElegibles.length);
+        if (empleadosElegibles.length > 0) {
+          console.log('[crearCiclo] Muestra primeros 3 elegibles =>', empleadosElegibles.slice(0,3).map(e => ({ id:e.id_empleado, sueldo:e.sueldo, antig:e.antiguedad_meses })));
+        }
+      } catch(_) {}
 
       if (empleadosElegibles.length === 0) {
         return res.status(400).json({
@@ -123,8 +129,7 @@ class CiclosController {
           message: 'No hay empleados elegibles para este ciclo',
           criterios: {
             antiguedad_minima: '3 meses',
-            rango_salarial: `$${smlv.valor_mensual} - $${smlv.valor_mensual * 2}`,
-            areas: ['Producción', 'Mercadista']
+            tope_salarial_max: `$${smlv.valor_mensual * 2}`
           }
         });
       }
@@ -142,24 +147,33 @@ class CiclosController {
         observaciones
       });
 
-      // Agregar empleados elegibles al ciclo
-      const empleadosParaCiclo = empleadosElegibles.map(emp => ({
-        id_empleado: emp.id_empleado,
-        antiguedad_meses: emp.antiguedad_meses,
-        sueldo_al_momento: emp.sueldo,
-        id_area: emp.id_area
-      }));
-
-      const resultadoBatch = await EmpleadoCicloModel.createBatch(
+      // Insertar elegibles en una sola sentencia (más robusto frente a errores de loop)
+      const resultadoBatch = await EmpleadoCicloModel.insertElegiblesGlobalBatch(
         ciclo.id_ciclo,
-        empleadosParaCiclo
+        smlvValor
       );
+
+      // Debug mínimo para detectar por qué podría venir 0 insertados
+      try {
+        console.log('[crearCiclo] elegibles calculados =', empleadosElegibles.length);
+        const { insertados, errores, detalles } = resultadoBatch || {};
+        console.log('[crearCiclo] insertados =', insertados, 'errores =', errores);
+        if (detalles && Array.isArray(detalles.errores) && detalles.errores.length) {
+          console.log('[crearCiclo] ejemplo error 1:', detalles.errores[0]);
+        }
+      } catch (_) {}
 
       // Actualizar total de empleados elegibles en el ciclo
-      await CicloDotacionModel.updateTotalEmpleados(
-        ciclo.id_ciclo,
-        resultadoBatch.insertados
-      );
+  // número efectivo insertado (puede ser menor si faltan kits, pero seguimos mostrando los elegibles reales)
+  await CicloDotacionModel.updateTotalEmpleados(ciclo.id_ciclo, resultadoBatch.insertados);
+
+      // Backfill defensivo: si por alguna razón quedaron registros sin id_kit, asignarlo por área
+      try {
+        const corregidos = await EmpleadoCicloModel.backfillKitsPorArea(ciclo.id_ciclo);
+        if (corregidos > 0) {
+          console.log('[crearCiclo] Backfill id_kit aplicado para', corregidos, 'registros');
+        }
+      } catch (_) {}
 
       res.status(201).json({
         success: true,
@@ -170,7 +184,12 @@ class CiclosController {
           fecha_entrega,
           estado: 'activo',
           total_empleados: resultadoBatch.insertados,
-          smlv_aplicado: smlv.valor_mensual
+          smlv_aplicado: smlvValor,
+          empleados_asignados: resultadoBatch.insertados,
+          total_elegibles: empleadosElegibles.length,
+          elegibles_detectados: empleadosElegibles.length,
+          elegibles_insertados: resultadoBatch.insertados,
+          diferencia_elegibles: empleadosElegibles.length - resultadoBatch.insertados
         },
         empleados: resultadoBatch
       });
@@ -285,17 +304,31 @@ class CiclosController {
       // Validar ventana
       const validacion = await CicloDotacionModel.validarVentana(fecha_entrega);
 
-      // Calcular elegibles con normalización defensiva
+      // Calcular lista completa de candidatos y clasificar sin romper compatibilidad
       const smlvValor = parseFloat(smlv.valor_mensual);
-      const empleadosRaw = await EmpleadoCicloModel.calcularElegibles(
-        id_area_produccion,
-        id_area_mercadista,
-        smlvValor
+      // Consultar elegibles directamente en SQL para evitar inconsistencias
+  const empleados = await EmpleadoCicloModel.calcularElegiblesGlobal(smlvValor);
+
+      // Calcular candidatos con sueldo > 2 SMLV (para mostrar como no elegibles por tope)
+      const noElegiblesRows = await query(
+        `SELECT e.id_empleado, e.nombre, e.apellido, e.sueldo, a.nombre_area,
+                TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses
+         FROM empleado e
+         INNER JOIN area a ON e.id_area = a.id_area
+         WHERE e.sueldo > (? * 2)
+         ORDER BY a.nombre_area, e.apellido, e.nombre`,
+        [smlvValor]
       );
-      const empleados = Array.isArray(empleadosRaw) ? empleadosRaw : [];
-      if (!Array.isArray(empleadosRaw)) {
-        console.warn('[previewEmpleadosElegibles] empleados no es array; normalizando a []');
-      }
+      const noElegibles = Array.isArray(noElegiblesRows)
+        ? noElegiblesRows.map(r => ({
+            ...r,
+            motivo: 'sueldo > 2 SMLV'
+          }))
+        : [];
+
+      // Total candidatos (todos activos con sueldo > 0) para referencia
+  const totalActivosRows = await query('SELECT COUNT(*) as total FROM empleado WHERE sueldo > 0');
+  const totalActivos = Array.isArray(totalActivosRows) && totalActivosRows[0] ? Number(totalActivosRows[0].total) : 0;
 
       // Agrupar por área (objeto y arreglo compatible con el frontend)
       const porArea = empleados.reduce((acc, emp) => {
@@ -309,10 +342,17 @@ class CiclosController {
         id_area: porArea[nombre][0] ? porArea[nombre][0].id_area : null
       }));
 
+      // Log mínimo para diagnosticar in situ
+      try {
+        console.log('[previewEmpleadosElegibles] totalActivos=', totalActivos, 'elegibles=', empleados.length, 'noElegiblesAltos=', noElegibles.length, 'smlv=', smlvValor);
+      } catch (_) {}
+
       res.json({
         success: true,
         data: {
+          total_activos: totalActivos,
           total_elegibles: empleados.length,
+          total_no_elegibles: noElegibles.length,
           smlv_aplicado: smlv.valor_mensual,
           smlv_aplicable: smlvValor, // compatibilidad con frontend
           rango_salarial: {
@@ -327,6 +367,7 @@ class CiclosController {
             dias_restantes: validacion.dias_restantes
           },
           empleados: empleados,
+          no_elegibles: noElegibles,
           por_area: porArea,
           empleados_por_area: empleadosPorArea
         }
@@ -375,43 +416,64 @@ class CiclosController {
   static async obtenerEstadisticas(req, res) {
     try {
       const stats = await CicloDotacionModel.getEstadisticas();
-      res.json({
-        success: true,
-        data: stats
-      });
+      res.json({ success: true, data: stats });
     } catch (error) {
-      console.error('Error al obtener estadísticas:', error);
-      res.status(500).json({
-        success: false,
-        message: error.message
-      });
+      console.error('Error al actualizar estado de ciclo:', error);
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 
   /**
-   * Actualizar estado del ciclo (activo | cerrado)
+   * Actualizar el estado de un ciclo (activo | cerrado)
    */
   static async actualizarEstadoCiclo(req, res) {
     try {
       const { id } = req.params;
-      const { estado } = req.body || {};
+      const { estado } = req.body;
 
-      if (!estado) {
-        return res.status(400).json({ success: false, message: 'Estado requerido' });
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'ID de ciclo requerido' });
+      }
+      const estadosValidos = ['activo', 'cerrado'];
+      if (!estadosValidos.includes(estado)) {
+        return res.status(400).json({ success: false, message: 'Estado inválido' });
       }
 
-      await CicloDotacionModel.updateEstado(id, estado);
-
       const ciclo = await CicloDotacionModel.getById(id);
+      if (!ciclo) {
+        return res.status(404).json({ success: false, message: 'Ciclo no encontrado' });
+      }
 
-      res.json({
-        success: true,
-        message: `Ciclo actualizado a estado ${estado}`,
-        data: ciclo
-      });
+      // Modelo debería tener método para actualizar estado. Implementación básica aquí si no existe.
+      if (typeof CicloDotacionModel.updateEstado === 'function') {
+        await CicloDotacionModel.updateEstado(id, estado);
+      } else if (typeof CicloDotacionModel.update === 'function') {
+        await CicloDotacionModel.update(id, { estado });
+      } else {
+        return res.status(500).json({ success: false, message: 'Método updateEstado no implementado en CicloDotacionModel' });
+      }
+
+      res.json({ success: true, message: 'Estado de ciclo actualizado', data: { id_ciclo: id, estado } });
     } catch (error) {
       console.error('Error al actualizar estado de ciclo:', error);
       res.status(500).json({ success: false, message: error.message });
+    }
+  }
+  static async eliminarCiclo(req, res) {
+    try {
+      const { id } = req.params;
+      const { force } = req.query;
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'ID de ciclo requerido' });
+      }
+
+      const resultado = await CicloDotacionModel.delete(id, { force: String(force).toLowerCase() === 'true' });
+      res.json({ success: true, message: 'Ciclo eliminado correctamente', data: resultado });
+    } catch (error) {
+      console.error('Error al eliminar ciclo:', error);
+      const mensaje = error.message || 'Error al eliminar ciclo';
+      const status = /no se puede eliminar|entregas u omisiones/i.test(mensaje) ? 400 : 500;
+      res.status(status).json({ success: false, message: mensaje });
     }
   }
 
@@ -490,6 +552,46 @@ class CiclosController {
         success: false,
         message: error.message || 'Error al guardar SMLV'
       });
+    }
+  }
+
+  /**
+   * Rellenar (sincronizar) elegibles faltantes para un ciclo ya creado.
+   * Usa el SMLV aplicado del ciclo y la misma lógica de inserción con NOT EXISTS.
+   */
+  static async syncElegibles(req, res) {
+    try {
+      const { id } = req.params;
+      if (!id) return res.status(400).json({ success: false, message: 'ID de ciclo requerido' });
+
+      const ciclo = await CicloDotacionModel.getById(id);
+      if (!ciclo) return res.status(404).json({ success: false, message: 'Ciclo no encontrado' });
+
+      const smlvValor = Number.parseFloat(ciclo.valor_smlv_aplicado);
+      if (!Number.isFinite(smlvValor)) {
+        return res.status(400).json({ success: false, message: 'Ciclo no tiene SMLV aplicado válido' });
+      }
+
+      const resultado = await EmpleadoCicloModel.insertElegiblesGlobalBatch(Number(id), smlvValor);
+
+      // Intentar backfill de kits por si existen activos
+      const kitsAsignados = await EmpleadoCicloModel.backfillKitsPorArea(Number(id));
+
+      // Actualizar total en el ciclo (sumar lo nuevo al existente)
+      await CicloDotacionModel.updateTotalEmpleados(Number(id), ciclo.total_empleados + (resultado.insertados || 0));
+
+      res.json({
+        success: true,
+        message: 'Sincronización de elegibles completada',
+        data: {
+          id_ciclo: Number(id),
+          elegibles_insertados: resultado.insertados || 0,
+          kits_asignados: kitsAsignados
+        }
+      });
+    } catch (error) {
+      console.error('Error en syncElegibles:', error);
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 }

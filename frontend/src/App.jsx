@@ -10,6 +10,8 @@ import Areas from './pages/Areas';
 import Usuarios from './pages/Usuarios';
 import Proveedores from './pages/Proveedores';
 import Dotaciones from './pages/Dotaciones';
+import Pedidos from './pages/Pedidos';
+import Reportes from './pages/Reportes';
 import DashboardLayout from './components/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
@@ -406,7 +408,7 @@ function App() {
     setIsAuthenticated(false);
     
     // Forzar navegación inmediata
-    window.location.replace('/');
+    window.location.replace('/login');
   };
 
   const handleAnimationComplete = () => {
@@ -551,6 +553,30 @@ function App() {
               </ProtectedRoute>
             } 
           />
+
+          {/* Ruta de Pedidos */}
+          <Route 
+            path="/pedidos" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout onLogout={handleLogout}>
+                  <Pedidos />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Ruta de Reportes */}
+          <Route 
+            path="/reportes" 
+            element={
+              <ProtectedRoute>
+                <DashboardLayout onLogout={handleLogout}>
+                  <Reportes />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
           
           {/* Redirección por defecto */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -562,7 +588,170 @@ function App() {
 }
 
 // Componente separado para la Landing Page
+function PublicRegistrarModal({ onClose }) {
+  const [documento, setDocumento] = React.useState('');
+  const [empleado, setEmpleado] = React.useState(null);
+  const [kit, setKit] = React.useState([]);
+  const [tallasPorItemOptions, setTallasPorItemOptions] = React.useState({});
+  const [tallasSeleccionadas, setTallasSeleccionadas] = React.useState({});
+  const [loadingEmpleado, setLoadingEmpleado] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  const buscar = async () => {
+    if (!documento.trim()) { setError('Ingresa un documento'); return; }
+    setError('');
+    setLoadingEmpleado(true);
+    try {
+      const r = await fetch('/api/dotaciones/empleado/' + encodeURIComponent(documento));
+      const j = await r.json();
+      if (j.success) {
+        setEmpleado(j.data.empleado);
+        setKit(Array.isArray(j.data.dotaciones_disponibles) ? j.data.dotaciones_disponibles : []);
+        setTallasPorItemOptions({});
+        setTallasSeleccionadas({});
+      } else {
+        setEmpleado(null); setKit([]); setError(j.message || 'Empleado no encontrado');
+      }
+    } catch (e) { console.error(e); setError('Error de conexión'); }
+    finally { setLoadingEmpleado(false); }
+  };
+
+  // Cargar tallas por ítem que requiera talla
+  React.useEffect(() => {
+    const abortCtrl = new AbortController();
+    const cargar = async () => {
+      if (!empleado || kit.length === 0) return;
+      const nuevoOpts = {}; const nuevoSel = {};
+      for (const d of kit) {
+        if (!(d.talla_requerida === 1 || d.talla_requerida === '1')) continue;
+        try {
+          const resp = await fetch(`/api/dotaciones/tallas/${d.id_dotacion}/${empleado.id_empleado}`, { signal: abortCtrl.signal });
+          const json = await resp.json();
+          // Filtrar por tipo_articulo si viene y coincide parcialmente con el nombre de la dotación
+          let opts = Array.isArray(json.data) ? json.data : [];
+          if (opts.length) {
+            const nombreRef = (d.nombre_dotacion || d.nombre || '').toLowerCase();
+            // Heurística: si el tipo_articulo está presente y no aparece nada en el nombre, dejamos igual; si aparece coincidencia parcial, priorizamos orden.
+            opts = opts.sort((a,b) => {
+              const aMatch = nombreRef.includes(String(a.tipo_articulo||'').toLowerCase()) ? 1 : 0;
+              const bMatch = nombreRef.includes(String(b.tipo_articulo||'').toLowerCase()) ? 1 : 0;
+              return bMatch - aMatch;
+            });
+          }
+          nuevoOpts[d.id_dotacion] = opts;
+          if (opts.length) nuevoSel[d.id_dotacion] = opts[0].id_talla;
+        } catch (e) { if (e.name !== 'AbortError') { console.error('Error tallas', e); } nuevoOpts[d.id_dotacion] = []; }
+      }
+      setTallasPorItemOptions(nuevoOpts); setTallasSeleccionadas(nuevoSel);
+    };
+    cargar();
+    return () => abortCtrl.abort();
+  }, [empleado, kit]);
+
+  const guardar = async () => {
+    if (!empleado) { setError('Busca un empleado primero'); return; }
+    // construir tallas_por_item
+    const tallasPayload = kit.filter(d => d.talla_requerida === 1 || d.talla_requerida === '1')
+      .map(d => ({ id_dotacion: d.id_dotacion, id_talla: tallasSeleccionadas[d.id_dotacion] }))
+      .filter(x => x.id_talla);
+    if (tallasPayload.length === 0) { setError('No hay tallas seleccionadas'); return; }
+    setSaving(true); setError('');
+    try {
+      const resp = await fetch('/api/dotaciones/guardar-tallas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documento, tallas_por_item: tallasPayload })
+      });
+      const json = await resp.json();
+      if (json.success) {
+        alert('Tallas guardadas correctamente');
+        onClose();
+      } else { setError(json.message || 'Error guardando tallas'); }
+    } catch (e) { console.error(e); setError('Error de conexión al guardar'); }
+    finally { setSaving(false); }
+  };
+
+  // Bloquear scroll del body mientras el modal esté abierto
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-md p-4" role="dialog" aria-modal="true">
+      <div className="bg-white always-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden ring-1 ring-gray-200">
+        <div className="bg-[#B39237] text-white px-6 py-4 flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-semibold">Registrar Dotación (Tallas)</h2>
+            <p className="text-xs">Ingresa documento, ajusta tallas y guarda preferencias.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:opacity-80" aria-label="Cerrar">
+            <i className="bx bx-x text-xl"></i>
+          </button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div>
+            <label className="text-sm font-medium text-gray-600">Número de documento</label>
+            <div className="mt-2 flex gap-2">
+              <input value={documento} onChange={e=>setDocumento(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') buscar(); }}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-[#B39237] focus:border-[#B39237] text-sm" placeholder="Ingrese documento" />
+              <button onClick={buscar} disabled={loadingEmpleado} className="px-4 py-2 rounded-lg bg-[#B39237] text-white text-sm font-medium hover:bg-[#9C7F2F] disabled:opacity-50 flex items-center gap-2">
+                <i className="bx bx-search"></i>{loadingEmpleado?'Buscando...':'Buscar'}
+              </button>
+            </div>
+            {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+          </div>
+          {empleado && (
+            <div className="space-y-4">
+              <div className="border rounded-xl p-4 bg-white shadow-sm">
+                <p className="text-sm font-semibold text-gray-700">{empleado.nombre_completo}</p>
+                <p className="text-xs text-gray-500">Área: {empleado.area_nombre || empleado.id_area} · Ubicación: {empleado.nombre_ubicacion || empleado.id_ubicacion}</p>
+              </div>
+              <div className="border rounded-xl p-4 bg-white shadow-sm">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Kit del área</p>
+                {kit.length === 0 && <p className="text-xs text-gray-500">No se encontró kit para esta área.</p>}
+                <ul className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  {kit.map(item => (
+                    <li key={item.id_dotacion} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 truncate">{item.nombre_dotacion || item.nombre || 'Dotación '+item.id_dotacion}</span>
+                        <span className="text-xs text-gray-500">{item.cantidad_en_kit? item.cantidad_en_kit+' u.':''}</span>
+                      </div>
+                      {(item.talla_requerida === 1 || item.talla_requerida === '1') && (
+                        <div className="mt-2">
+                          <label className="text-xs text-gray-600 mb-1 block">Talla</label>
+                          <select value={tallasSeleccionadas[item.id_dotacion]||''} onChange={e=>setTallasSeleccionadas(prev=>({ ...prev, [item.id_dotacion]: e.target.value }))}
+                            className="w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:ring-2 focus:ring-[#B39237] focus:border-[#B39237]">
+                            <option value="">Seleccione talla</option>
+                            {(tallasPorItemOptions[item.id_dotacion]||[]).map(t => (
+                              <option key={t.id_talla} value={t.id_talla}>{t.talla || t.descripcion || t.tipo_articulo}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-between items-center px-6 py-4 border-t bg-white">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50">Cancelar</button>
+          <button onClick={guardar} disabled={!empleado || saving} className="px-5 py-2 rounded-lg bg-[#B39237] text-white text-sm font-semibold hover:bg-[#9C7F2F] disabled:opacity-50 flex items-center gap-2">
+            {saving && <i className="bx bx-loader-alt animate-spin"></i>} Guardar cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LandingPage() {
+  const [showRegistrarModal, setShowRegistrarModal] = React.useState(false);
+  const openRegistrar = () => setShowRegistrarModal(true);
+  const closeRegistrar = () => setShowRegistrarModal(false);
   return (
     <>
       {/* Header Principal */}
@@ -585,23 +774,34 @@ function LandingPage() {
                   Sistema Integrado para el Registro de Dotación Sonora
                 </p>
               </div>
+
+              {/* (se removieron botones de la izquierda) */}
             </div>
-            
-            {/* Botón de Login */}
-            <a
-              href="/login"
-              className="always-white bg-white border-2 border-primary-500 text-primary-500 hover:bg-primary-50 hover:border-primary-400 hover:text-primary-400 px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
-            >
-              <i className="bx bx-log-in text-xl"></i>
-              <span>Iniciar Sesión</span>
-            </a>
+            {/* Botones juntos al lado derecho */}
+            <div className="flex items-center space-x-4">
+              <button
+                type="button"
+                onClick={openRegistrar}
+                className="always-white bg-gradient-to-r from-[#D4AF37] to-[#B39237] text-white border-2 border-[#D4AF37] hover:from-[#B39237] hover:to-[#9C7F2F] px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
+              >
+                <i className="bx bx-package text-xl"></i>
+                <span>Registrar Dotación</span>
+              </button>
+              <a
+                href="/login"
+                className="always-white bg-white border-2 border-primary-500 text-primary-500 hover:bg-primary-50 hover:border-primary-400 hover:text-primary-400 px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
+              >
+                <i className="bx bx-log-in text-xl"></i>
+                <span>Iniciar Sesión</span>
+              </a>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Hero Section (mejorado: título centrado a lo largo de toda la pantalla) */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-primary-50"></div>
+        <div className="absolute inset-0 bg-[#F5F2E8]"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
           
           {/* Contenido centrado a lo largo de toda la pantalla */}
@@ -639,8 +839,8 @@ function LandingPage() {
       </section>
       
       
-      <section className="relative overflow-hidden">
-  <div className="absolute inset-0 bg-primary-50"></div>
+    <section className="relative overflow-hidden">
+  <div className="absolute inset-0 bg-[#F5F2E8]"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <h2 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
@@ -749,7 +949,7 @@ function LandingPage() {
       </section>
 
       <section className="relative overflow-hidden">
-  <div className="absolute inset-0 bg-primary-50"></div>
+  <div className="absolute inset-0 bg-[#F5F2E8]"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center">
             <h2 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
@@ -990,7 +1190,7 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
+  {/* Footer */}
       <footer className="bg-slate-800 text-white relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 lg:gap-12">
@@ -1100,8 +1300,7 @@ function LandingPage() {
           </div>
         </div>
       </footer>
-
-
+      {showRegistrarModal && <PublicRegistrarModal onClose={closeRegistrar} />}
     </>
   );
 }

@@ -380,10 +380,28 @@ const KitManager = ({ onCreated }) => {
                       </span>
                     </td>
                     <td className="px-2 py-2.5 text-sm text-gray-900 whitespace-nowrap">
-                      <div className="flex gap-2">
-                        <button onClick={() => toggleView(k.id_kit)} className="inline-flex items-center justify-center h-9 w-24 rounded-md text-sm font-medium text-white bg-[#B39237] hover:bg-[#9C7F2F] transition">Detalles</button>
-                        <button onClick={() => handleEdit(k.id_kit)} className="inline-flex items-center justify-center h-9 w-24 rounded-md text-sm font-medium text-white bg-[#B39237] hover:bg-[#9C7F2F] transition">Editar</button>
-                        <button onClick={() => handleDelete(k.id_kit)} className="inline-flex items-center justify-center h-9 w-24 rounded-md text-sm font-medium text-gray-900 bg-gray-100 hover:bg-gray-200 transition">Eliminar</button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleView(k.id_kit)}
+                          className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                          title="Detalles"
+                        >
+                          <i className='bx bx-show text-lg'></i>
+                        </button>
+                        <button
+                          onClick={() => handleEdit(k.id_kit)}
+                          className="p-2 rounded-lg text-[#B39237] hover:text-[#D4AF37] hover:bg-[#F7F2E0] transition-colors"
+                          title="Editar"
+                        >
+                          <i className='bx bx-pencil text-lg'></i>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(k.id_kit)}
+                          className="p-2 rounded-lg text-[#B39237] hover:text-[#D4AF37] hover:bg-[#F7F2E0] transition-colors"
+                          title="Eliminar"
+                        >
+                          <i className='bx bx-trash text-lg'></i>
+                        </button>
                       </div>
                     </td>
                   </tr>

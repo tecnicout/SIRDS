@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import ResourceHeader from '../components/UI/ResourceHeader';
+import CardPanel from '../components/UI/CardPanel';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -19,97 +21,37 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header de bienvenida */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          ¡Bienvenido{user ? `, ${user.nombre_completo || user.nombre || user.username}` : ''}!
-        </h1>
-        <p className="text-gray-600 mb-2">
-          Sistema Integrado para el Registro de Dotación Sonora - Arroz Sonora
-        </p>
-        {user && (
-          <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-            {user.cargo && <span><i className="bx bx-buildings text-lg mr-1"></i> {user.cargo}</span>}
-            {user.area && <span><i className="bx bx-map-pin text-lg mr-1"></i> {user.area}</span>}
-            {user.nombre_rol && <span><i className="bx bx-user text-lg mr-1"></i> {user.nombre_rol.toUpperCase()}</span>}
-            {user.ubicacion && <span><i className="bx bx-world text-lg mr-1"></i> {user.ubicacion}</span>}
-          </div>
-        )}
-      </div>
+      <ResourceHeader
+        title={`Bienvenido${user ? `, ${user.nombre_completo || user.nombre || user.username}` : ''}`}
+        subtitle="Sistema Integrado para el Registro de Dotación Sonora - Arroz Sonora"
+        stats={[
+          { icon: 'bx-group', label: 'Empleados', value: 245 },
+          { icon: 'bx-package', label: 'Dotaciones', value: '1,247' },
+          { icon: 'bx-notepad', label: 'Pedidos', value: 34 },
+          { icon: 'bx-zap', label: 'Entregas', value: 89 },
+        ]}
+      />
 
-      {/* Cards de estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-              <i className="bx bx-group text-3xl text-white"></i>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Empleados</p>
-              <p className="text-2xl font-semibold text-gray-900">245</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-              <i className="bx bx-package text-3xl text-white"></i>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Dotaciones</p>
-              <p className="text-2xl font-semibold text-gray-900">1,247</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
-              <i className="bx bx-clipboard text-3xl text-white"></i>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Solicitudes</p>
-              <p className="text-2xl font-semibold text-gray-900">34</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
-              <i className="bx bx-zap text-3xl text-white"></i>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Entregas</p>
-              <p className="text-2xl font-semibold text-gray-900">89</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Información del usuario actual */}
-      <div className="bg-gradient-to-r from-primary-500 to-blue-600 rounded-lg shadow-sm p-6 text-white">
-        <h3 className="text-lg font-semibold mb-4">Información de Sesión</h3>
+      <CardPanel title="Información de Sesión" icon="bx-id-card">
         {user ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <p><span className="font-medium">Nombre Completo:</span> {user.nombre} {user.apellido}</p>
               <p><span className="font-medium">ID Empleado:</span> {user.id_empleado}</p>
               <p><span className="font-medium">Email:</span> {user.email || 'No registrado'}</p>
             </div>
             <div className="space-y-2">
-              <p><span className="font-medium">Rol:</span> {user.id_rol ? `Rol ${user.id_rol}` : 'Usuario'}</p>
-              <p><span className="font-medium">Estado:</span> <span className="bg-green-400 px-2 py-1 rounded text-sm font-medium">Activo</span></p>
+              <p><span className="font-medium">Rol:</span> {user.nombre_rol || (user.id_rol ? `Rol ${user.id_rol}` : 'Usuario')}</p>
+              <p><span className="font-medium">Ubicación:</span> {user.ubicacion || 'N/A'}</p>
               <p><span className="font-medium">Última conexión:</span> {new Date().toLocaleDateString()}</p>
             </div>
           </div>
         ) : (
-          <div className="text-center py-4">
-            <p className="text-white/80">Cargando información del usuario...</p>
+          <div className="text-center py-6 text-gray-500">
+            Cargando información del usuario...
           </div>
         )}
-      </div>
+      </CardPanel>
     </div>
   );
 }

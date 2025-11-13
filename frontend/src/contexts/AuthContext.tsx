@@ -74,6 +74,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       localStorage.removeItem('token');
       setUser(null);
+      // Redirigir explícitamente a la vista de login
+      if (typeof window !== 'undefined') {
+        window.location.replace('/login');
+      }
     } catch (err) {
       console.error('Error en logout:', err);
       setError('Error al cerrar sesión');

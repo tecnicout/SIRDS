@@ -57,6 +57,13 @@ router.post('/', CiclosController.crearCiclo);
 router.put('/:id/estado', CiclosController.actualizarEstadoCiclo);
 
 /**
+ * DELETE /api/ciclos/:id?force=true
+ * Sin force: elimina solo si no hay entregas u omisiones (purga procesados).
+ * Con force=true: elimina aunque existan entregas u omisiones (purga todo empleado_ciclo primero).
+ */
+router.delete('/:id', CiclosController.eliminarCiclo);
+
+/**
  * GET /api/ciclos/:id/empleados
  * Obtener empleados de un ciclo con paginación
  * Query params: page, limit, estado, area
@@ -86,5 +93,11 @@ router.get('/smlv/todos', CiclosController.listarSMLV);
  * Body: { anio, valor_mensual, observaciones? }
  */
 router.post('/smlv', CiclosController.guardarSMLV);
+
+/**
+ * POST /api/ciclos/:id/sync-elegibles
+ * Reinsertar elegibles faltantes en un ciclo existente (usa NOT EXISTS)
+ */
+router.post('/:id/sync-elegibles', CiclosController.syncElegibles);
 
 module.exports = router;

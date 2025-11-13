@@ -343,6 +343,37 @@ class UsuarioModel {
         return result.affectedRows > 0;
     }
 
+    /**
+     * Eliminar usuario (hard delete)
+     * @param {number} id
+     * @param {number} eliminadoPor
+     * @returns {boolean}
+     */
+    static async delete(id, eliminadoPor) {
+        // Registrar movimiento si existe tabla de historial (opcional)
+        try {
+            const checkTable = await query(`SELECT COUNT(*) as existe FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'HistorialMovimientos'`);
+            if (checkTable[0]?.existe) {
+                const before = await this.getById(id);
+                const sqlHist = `
+                    INSERT INTO HistorialMovimientos (tabla_afectada, operacion, id_registro_afectado, valores_anteriores, valores_nuevos, realizada_por, fecha_movimiento)
+                    VALUES (?, ?, ?, ?, ?, ?, NOW())
+                `;
+                await query(sqlHist, [
+                    'Usuario', 'DELETE', id,
+                    JSON.stringify(before || {}), JSON.stringify({ eliminado: true }),
+                    eliminadoPor
+                ]);
+            }
+        } catch (auditErr) {
+            console.warn('[UsuarioModel.delete] auditoría falló:', auditErr.message);
+        }
+
+        const sql = `DELETE FROM Usuario WHERE id_usuario = ?`;
+        const result = await query(sql, [id]);
+        return result.affectedRows > 0;
+    }
+
     // ===========================================
     // MÉTODOS DE CONSULTA ESPECÍFICOS
     // ===========================================

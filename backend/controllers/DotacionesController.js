@@ -43,6 +43,77 @@ class DotacionesController {
         }
     }
 
+    // Guardar preferencias de tallas por empleado (sin registrar entrega)
+    static async guardarTallasEmpleado(req, res) {
+        try {
+            const { id_empleado, documento, tallas_por_item } = req.body || {};
+            if ((!id_empleado && !documento) || !Array.isArray(tallas_por_item)) {
+                return res.status(400).json({ success: false, message: 'Campos requeridos: id_empleado o documento y tallas_por_item[]' });
+            }
+
+            // Resolver id_empleado por documento si no viene
+            let empleadoId = id_empleado;
+            if (!empleadoId && documento) {
+                const empRows = await query('SELECT id_empleado FROM empleado WHERE Identificacion = ? LIMIT 1', [documento]);
+                if (!empRows.length) {
+                    return res.status(404).json({ success: false, message: 'Empleado no encontrado por documento' });
+                }
+                empleadoId = empRows[0].id_empleado;
+            }
+
+            // Validar kit para área (opcional: sólo permitir guardar para dotaciones del kit)
+            const areaRows = await query('SELECT id_area FROM empleado WHERE id_empleado = ? LIMIT 1', [empleadoId]);
+            const id_area = areaRows.length ? areaRows[0].id_area : null;
+            let kitDotacionesIds = [];
+            if (id_area) {
+                const kitRow = await query('SELECT id_kit FROM kitdotacion WHERE id_area = ? AND activo = 1 LIMIT 1', [id_area]);
+                if (kitRow.length) {
+                    const comp = await query('SELECT id_dotacion FROM detallekitdotacion WHERE id_kit = ?', [kitRow[0].id_kit]);
+                    kitDotacionesIds = comp.map(r => r.id_dotacion);
+                }
+            }
+
+                        // Asegurar tabla de preferencias de tallas
+                        await query(`
+                                CREATE TABLE IF NOT EXISTS empleado_talla_dotacion (
+                                    id INT AUTO_INCREMENT PRIMARY KEY,
+                                    id_empleado INT NOT NULL,
+                                    id_dotacion INT NOT NULL,
+                                    id_talla INT NOT NULL,
+                                    fecha_actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                    UNIQUE KEY uniq_empleado_dotacion (id_empleado, id_dotacion),
+                                    CONSTRAINT fk_etd_empleado FOREIGN KEY (id_empleado) REFERENCES empleado(id_empleado),
+                                    CONSTRAINT fk_etd_dotacion FOREIGN KEY (id_dotacion) REFERENCES dotacion(id_dotacion),
+                                    CONSTRAINT fk_etd_talla FOREIGN KEY (id_talla) REFERENCES talla(id_talla)
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                        `);
+
+                        const EmpleadoTallaModel = require('../models/EmpleadoTallaModel');
+            const toPersist = [];
+            for (const item of tallas_por_item) {
+                if (!item || !item.id_dotacion || !item.id_talla) continue;
+                if (kitDotacionesIds.length && !kitDotacionesIds.includes(Number(item.id_dotacion))) {
+                    // Ignorar dotaciones fuera del kit del área
+                    continue;
+                }
+                // Verificar que dotación requiere talla; si no, ignorar
+                const [dotRow] = await query('SELECT talla_requerida FROM dotacion WHERE id_dotacion = ? LIMIT 1', [item.id_dotacion]);
+                if (!dotRow || !dotRow.talla_requerida) continue;
+                toPersist.push({ id_dotacion: Number(item.id_dotacion), id_talla: Number(item.id_talla) });
+            }
+
+            if (!toPersist.length) {
+                return res.json({ success: true, data: { updated: 0 }, message: 'No hay tallas válidas para guardar' });
+            }
+
+            const result = await EmpleadoTallaModel.upsertPreferenciasBatch(empleadoId, toPersist);
+            return res.json({ success: true, data: result, message: 'Tallas guardadas correctamente' });
+        } catch (error) {
+            console.error('Error al guardar tallas empleado:', error);
+            return res.status(500).json({ success: false, message: 'Error al guardar tallas', error: error.message });
+        }
+    }
+
     // Obtener una dotación por ID (detallada)
     static async getByIdItem(req, res) {
         try {
@@ -84,7 +155,6 @@ class DotacionesController {
                 precio_unitario: Number(precio_unitario)
             });
 
-            // devolver el registro creado
             const created = await DotacionModel.getById(insertId);
             return res.status(201).json({ success: true, data: created, message: 'Dotación creada correctamente' });
         } catch (error) {
@@ -152,9 +222,7 @@ class DotacionesController {
                 limit = 10, 
                 search = '', 
                 area = '', 
-                estado = '',
-                fecha_desde = null,
-                fecha_hasta = null
+                estado = ''
             } = req.query || {};
 
             const pageNum = Math.max(parseInt(page, 10) || 1, 1);
@@ -172,11 +240,7 @@ class DotacionesController {
                 where.push('e.id_area = ?');
                 params.push(Number(area));
             }
-            // Filtrar por rango de fechas si están presentes (ciclo activo)
-            if (fecha_desde && fecha_hasta) {
-                where.push('DATE(ed.fecha_entrega) BETWEEN ? AND ?');
-                params.push(fecha_desde, fecha_hasta);
-            }
+            // No filtramos por fecha de entregadotacion: excluiría a "procesado" sin entrega.
             // Filtro por estado (modelo entregadotacion: todas las entregas son 'entregado')
             if (estado && String(estado).trim() !== '') {
                 const est = String(estado).trim().toLowerCase();
@@ -188,22 +252,6 @@ class DotacionesController {
             const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
             // Total de grupos (empleado + fecha)
-            const countSql = `
-                SELECT COUNT(DISTINCT e.id_empleado) AS total
-                FROM empleado_ciclo ec
-                INNER JOIN empleado e ON ec.id_empleado = e.id_empleado
-                LEFT JOIN entregadotacion ed ON ed.id_empleado = e.id_empleado 
-                    AND DATE(ed.fecha_entrega) BETWEEN ? AND ?
-                WHERE ec.id_ciclo = ?
-                ${whereSql}`;
-            let total = 0;
-            try {
-                const [{ total: tot }] = await query(countSql, params);
-                total = Number(tot) || 0;
-            } catch (err) {
-                total = 0;
-            }
-
             // Primero obtener el ciclo activo
             const cicloActivoSql = `
                 SELECT id_ciclo, fecha_inicio_ventana, fecha_fin_ventana
@@ -211,14 +259,18 @@ class DotacionesController {
                 WHERE estado = 'activo'
                 AND CURDATE() BETWEEN fecha_inicio_ventana AND fecha_fin_ventana
                 ORDER BY fecha_entrega ASC LIMIT 1`;
-            
             const [cicloActivo] = await query(cicloActivoSql);
-            
+
             if (!cicloActivo) {
-                return res.json({ success: true, data: [], total: 0, message: 'No hay ciclo activo' });
+                return res.json({ success: true, data: [], entregas: [], total: 0, message: 'No hay ciclo activo' });
             }
 
-            const selectSql = `
+            // Desde aquí, el estado de la fila se determina EXCLUSIVAMENTE por empleado_ciclo.estado
+            // para que un nuevo ciclo siempre inicie "limpio" (procesado) y solo cambie
+            // cuando se actualice explícitamente (p. ej. al registrar entrega del kit o vía API de ciclo).
+
+            // Query principal SIN GROUP BY (cumple only_full_group_by)
+            let selectSql = `
                 SELECT 
                     ec.id_empleado_ciclo AS id_entrega,
                     e.id_empleado,
@@ -230,10 +282,10 @@ class DotacionesController {
                     u.nombre AS nombre_ubicacion,
                     k2.id_kit AS id_kit,
                     k2.nombre AS nombre_kit,
-                    COALESCE(edc.fecha_entrega, ec.fecha_asignacion) AS fecha_entrega,
+                    COALESCE(ec.fecha_entrega_real, ec.fecha_asignacion) AS fecha_entrega,
                     ec.observaciones,
                     CASE 
-                        WHEN edc.id_entrega IS NOT NULL THEN 'entregado'
+                        WHEN ec.estado = 'entregado' THEN 'entregado'
                         WHEN ec.estado = 'en_proceso' THEN 'en proceso'
                         ELSE 'procesado'
                     END AS estado
@@ -243,66 +295,61 @@ class DotacionesController {
                 INNER JOIN ubicacion u ON e.id_ubicacion = u.id_ubicacion
                 LEFT JOIN kitdotacion k2 ON k2.id_area = e.id_area AND k2.activo = 1
                 INNER JOIN ciclo_dotacion cd ON ec.id_ciclo = cd.id_ciclo
-                LEFT JOIN entregadotacion edc ON edc.id_empleado = e.id_empleado 
-                    AND DATE(edc.fecha_entrega) BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana
                 WHERE ec.id_ciclo = ?
-                AND cd.estado = 'activo'
-                AND CURDATE() BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana
-                ${whereSql}
-                GROUP BY 
-                    ec.id_empleado_ciclo,
-                    e.id_empleado,
-                    e.nombre,
-                    e.apellido,
-                    e.Identificacion,
-                    e.telefono,
-                    e.cargo,
-                    a.nombre_area,
-                    u.nombre,
-                    k2.id_kit,
-                    k2.nombre,
-                    ed.fecha_entrega,
-                    ec.fecha_asignacion,
-                    ec.observaciones,
-                    ec.estado
-                ORDER BY fecha_entrega DESC
-                LIMIT ${limitNum} OFFSET ${offset}`;
-            let rows;
-            try {
-                // Solo necesitamos el id del ciclo activo
-                const allParams = [
-                    ...params,
-                    cicloActivo.id_ciclo
-                ];
-                rows = await query(selectSql, allParams);
-            } catch (selectErr) {
-                console.warn('[getEntregas] Fallback simple por error en SELECT principal:', selectErr && selectErr.message);
-                const fallbackSql = `
-                    SELECT 
-                        MIN(ed.id_entrega) AS id_entrega,
-                        e.id_empleado,
-                        MIN(CONCAT(e.nombre, ' ', e.apellido)) AS nombre_empleado,
-                        MIN(e.Identificacion) AS documento,
-                        NULL AS telefono,
-                        NULL AS cargo,
-                        NULL AS nombre_area,
-                        NULL AS nombre_ubicacion,
-                        NULL AS id_kit,
-                        NULL AS nombre_kit,
-                        DATE(ed.fecha_entrega) AS fecha_entrega,
-                        NULL AS observaciones,
-                        'entregado' AS estado,
-                        COUNT(*) AS items_count
-                    FROM entregadotacion ed
-                    INNER JOIN empleado e ON ed.id_empleado = e.id_empleado
-                    ${whereSql}
-                    GROUP BY e.id_empleado, DATE(ed.fecha_entrega)
-                    ORDER BY fecha_entrega DESC
-                    LIMIT ${limitNum} OFFSET ${offset}`;
-                rows = await query(fallbackSql, params);
+                  AND cd.estado = 'activo'
+                  AND CURDATE() BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana`;
+
+                                        const selectParams = [cicloActivo.id_ciclo];
+
+            if (search && String(search).trim() !== '') {
+                const pattern = `%${String(search).trim()}%`;
+                selectSql += ' AND (e.nombre LIKE ? OR e.apellido LIKE ? OR e.Identificacion LIKE ? OR e.cargo LIKE ?)';
+                selectParams.push(pattern, pattern, pattern, pattern);
+            }
+            if (area && String(area).trim() !== '') {
+                selectSql += ' AND a.id_area = ?';
+                selectParams.push(Number(area));
+            }
+            if (estado && String(estado).trim() !== '') {
+                const est = String(estado).trim().toLowerCase();
+                if (est === 'entregado') {
+                    selectSql += ' AND ec.estado = "entregado"';
+                } else if (est === 'procesado') {
+                    selectSql += ' AND ec.estado = "procesado"';
+                } else if (est === 'en proceso') {
+                    selectSql += ' AND ec.estado = "en_proceso"';
+                }
             }
 
-            return res.json({ success: true, data: rows, entregas: rows, total, message: 'Entregas obtenidas correctamente' });
+            selectSql += ` ORDER BY a.nombre_area, e.apellido, e.nombre LIMIT ${limitNum} OFFSET ${offset}`;
+
+            const rows = await query(selectSql, selectParams);
+
+            // Total (repetir condiciones sin LIMIT/OFFSET)
+            let countSql = 'SELECT COUNT(*) AS total FROM empleado_ciclo ec INNER JOIN empleado e ON ec.id_empleado = e.id_empleado INNER JOIN area a ON e.id_area = a.id_area INNER JOIN ciclo_dotacion cd ON ec.id_ciclo = cd.id_ciclo WHERE ec.id_ciclo = ? AND cd.estado = "activo" AND CURDATE() BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana';
+            const countParams = [cicloActivo.id_ciclo];
+            if (search && String(search).trim() !== '') {
+                const pattern = `%${String(search).trim()}%`;
+                countSql += ' AND (e.nombre LIKE ? OR e.apellido LIKE ? OR e.Identificacion LIKE ? OR e.cargo LIKE ?)';
+                countParams.push(pattern, pattern, pattern, pattern);
+            }
+            if (area && String(area).trim() !== '') {
+                countSql += ' AND a.id_area = ?';
+                countParams.push(Number(area));
+            }
+            if (estado && String(estado).trim() !== '') {
+                const est = String(estado).trim().toLowerCase();
+                if (est === 'entregado') {
+                    countSql += ' AND ec.estado = "entregado"';
+                } else if (est === 'procesado') {
+                    countSql += ' AND ec.estado = "procesado"';
+                } else if (est === 'en proceso') {
+                    countSql += ' AND ec.estado = "en_proceso"';
+                }
+            }
+            const [{ total }] = await query(countSql, countParams);
+
+            return res.json({ success: true, data: rows, entregas: rows, total: Number(total)||0, message: 'Entregas obtenidas correctamente' });
         } catch (error) {
             console.error('Error al obtener entregas:', error);
             res.status(500).json({ success: false, message: 'Error al obtener entregas', error: error.message });
@@ -442,19 +489,56 @@ class DotacionesController {
             if (!id) return res.status(400).json({ success: false, message: 'id es requerido' });
             // Tomar el registro base por id_entrega y traer todos los items de ese empleado en esa fecha
             const base = await query('SELECT id_empleado, DATE(fecha_entrega) AS f FROM entregadotacion WHERE id_entrega = ? LIMIT 1', [Number(id)]);
-            if (!base || base.length === 0) {
-                return res.json({ success: true, data: [], message: 'Items no encontrados' });
+            if (base && base.length) {
+                const { id_empleado, f } = base[0];
+                const sql = `
+                    SELECT ed.id_entrega, ed.id_dotacion, d.nombre_dotacion, ed.cantidad, ed.id_talla, t.talla, t.tipo_articulo
+                    FROM entregadotacion ed
+                    INNER JOIN dotacion d ON d.id_dotacion = d.id_dotacion
+                    LEFT JOIN talla t ON t.id_talla = ed.id_talla
+                    WHERE ed.id_empleado = ? AND DATE(ed.fecha_entrega) = ?
+                    ORDER BY d.nombre_dotacion`;
+                const items = await query(sql, [id_empleado, f]);
+                return res.json({ success: true, data: items, message: 'Items de entrega obtenidos correctamente' });
             }
-            const { id_empleado, f } = base[0];
-            const sql = `
-                SELECT ed.id_entrega, ed.id_dotacion, d.nombre_dotacion, ed.cantidad, ed.id_talla, t.talla, t.tipo_articulo
-                FROM entregadotacion ed
-                INNER JOIN dotacion d ON d.id_dotacion = ed.id_dotacion
-                LEFT JOIN talla t ON t.id_talla = ed.id_talla
-                WHERE ed.id_empleado = ? AND DATE(ed.fecha_entrega) = ?
+
+            // Fallback: si no hay entrega registrada, el id puede ser un id_empleado_ciclo (estado procesado)
+            const cicloRow = await query(`
+                SELECT ec.id_empleado_ciclo, ec.id_empleado, ec.id_kit, e.id_area
+                FROM empleado_ciclo ec
+                INNER JOIN empleado e ON ec.id_empleado = e.id_empleado
+                WHERE ec.id_empleado_ciclo = ? LIMIT 1`, [Number(id)]);
+            if (!cicloRow || cicloRow.length === 0) {
+                return res.json({ success: true, data: [], message: 'Items no encontrados para esta referencia' });
+            }
+            const { id_area } = cicloRow[0];
+
+            // Buscar kit activo por área
+            const kitMeta = await query('SELECT id_kit, nombre FROM kitdotacion WHERE id_area = ? AND activo = 1 LIMIT 1', [id_area]);
+            const kitId = kitMeta && kitMeta[0] ? kitMeta[0].id_kit : null;
+            if (!kitId) {
+                return res.json({ success: true, data: [], message: 'Sin kit activo para el área' });
+            }
+
+            // Composición del kit
+            const compSql = `
+                SELECT dkd.id_kit, dkd.id_dotacion, d.nombre_dotacion, dkd.cantidad AS cantidad_en_kit, d.talla_requerida
+                FROM detallekitdotacion dkd
+                INNER JOIN dotacion d ON dkd.id_dotacion = d.id_dotacion
+                WHERE dkd.id_kit = ?
                 ORDER BY d.nombre_dotacion`;
-            const items = await query(sql, [id_empleado, f]);
-            return res.json({ success: true, data: items, message: 'Items de entrega obtenidos correctamente' });
+            const comp = await query(compSql, [kitId]);
+
+            const itemsPrevistos = (comp || []).map(r => ({
+                id_entrega: null,
+                id_dotacion: r.id_dotacion,
+                nombre_dotacion: r.nombre_dotacion,
+                cantidad: r.cantidad_en_kit,
+                cantidad_en_kit: r.cantidad_en_kit,
+                talla: null,
+                talla_requerida: r.talla_requerida
+            }));
+            return res.json({ success: true, data: itemsPrevistos, message: 'Ítems previstos del kit (sin entrega registrada)' });
         } catch (error) {
             console.error('Error al obtener items de entrega:', error);
             return res.status(500).json({ success: false, message: 'Error al obtener items de entrega', error: error.message });
@@ -604,50 +688,73 @@ class DotacionesController {
         }
     }
 
-    // Obtener tallas disponibles por dotación y empleado (filtradas por género)
+    // Obtener tallas disponibles por dotación y empleado (filtradas por género y tipo de prenda)
     static async getTallasDisponibles(req, res) {
         try {
             const { id_dotacion, id_empleado } = req.params;
-            
-            // Primero verificar si la dotación requiere talla
-            const dotacionSql = `
-                SELECT talla_requerida FROM dotacion WHERE id_dotacion = ?
+
+            // 1) Verificar si la dotación requiere talla y obtener su nombre
+            const dotacionMetaSql = `
+                SELECT nombre_dotacion, talla_requerida
+                FROM dotacion
+                WHERE id_dotacion = ?
+                LIMIT 1
             `;
-            const [dotacion] = await query(dotacionSql, [id_dotacion]);
-            
-            if (!dotacion.talla_requerida) {
+            const [dotacionMeta] = await query(dotacionMetaSql, [Number(id_dotacion)]);
+
+            if (!dotacionMeta) {
+                return res.status(404).json({ success: false, message: 'Dotación no encontrada' });
+            }
+
+            if (!Number(dotacionMeta.talla_requerida)) {
                 return res.json({
                     success: true,
                     data: [],
                     message: 'Esta dotación no requiere talla específica'
                 });
             }
-            
-            // Obtener género del empleado y tallas disponibles
-            const sql = `
-                SELECT DISTINCT 
-                    t.id_talla,
-                    t.talla,
-                    t.tipo_articulo,
-                    s.cantidad as stock_disponible
-                FROM talla t
-                INNER JOIN empleado e ON t.id_genero = e.id_genero
-                LEFT JOIN stockdotacion s ON t.id_talla = s.id_talla AND s.id_dotacion = ?
-                WHERE e.id_empleado = ?
-                AND (s.cantidad > 0 OR s.cantidad IS NULL)
-                ORDER BY t.talla
+
+            // 2) Obtener género del empleado
+            const genSql = 'SELECT id_genero FROM empleado WHERE id_empleado = ? LIMIT 1';
+            const [emp] = await query(genSql, [Number(id_empleado)]);
+            if (!emp) {
+                return res.status(404).json({ success: false, message: 'Empleado no encontrado' });
+            }
+
+            // 3) Determinar el tipo de prenda según el nombre de la dotación
+            const nombre = String(dotacionMeta.nombre_dotacion || '').toLowerCase();
+            let tipo = null;
+            // Reglas de mapeo por nombre
+            if (/(camis|camisa|camisón)/i.test(nombre)) tipo = 'Camisa';
+            else if (/overol/i.test(nombre)) tipo = 'Overol';
+            else if (/pantal/i.test(nombre)) tipo = 'Pantalón';
+            else if (/(bota|botas|zapato|zapatos)/i.test(nombre)) tipo = 'Zapato';
+            else if (/guant/i.test(nombre)) tipo = 'Guante';
+            else if (/chaleco/i.test(nombre)) tipo = 'Chaleco';
+
+            // Si no se pudo inferir el tipo, devolver vacío para evitar mezclar tallajes erróneos
+            if (!tipo) {
+                return res.json({ success: true, data: [], message: 'No hay tallas definidas para esta prenda' });
+            }
+
+            // 4) Traer tallas por género y tipo exacto desde la tabla talla
+            const tallasSql = `
+                SELECT id_talla, talla, tipo_articulo
+                FROM talla
+                WHERE id_genero = ? AND tipo_articulo = ?
+                ORDER BY 
+                    CASE WHEN talla REGEXP '^[0-9]+$' THEN LPAD(talla, 3, '0') ELSE talla END
             `;
-            
-            const tallas = await query(sql, [id_dotacion, id_empleado]);
-            
-            res.json({
+            const tallas = await query(tallasSql, [emp.id_genero, tipo]);
+
+            return res.json({
                 success: true,
                 data: tallas,
                 message: 'Tallas disponibles obtenidas correctamente'
             });
         } catch (error) {
             console.error('Error al obtener tallas disponibles:', error);
-            res.status(500).json({
+            return res.status(500).json({
                 success: false,
                 message: 'Error al obtener tallas disponibles',
                 error: error.message
@@ -815,6 +922,24 @@ class DotacionesController {
             
             await query(historialSql, [result.insertId, detalleMovimiento]);
             
+            // Sincronizar con ciclo activo: marcar estado 'entregado' del empleado en el ciclo actual
+            try {
+                const cicloRows = await query(`SELECT id_ciclo FROM ciclo_dotacion WHERE estado = 'activo' ORDER BY id_ciclo DESC LIMIT 1`);
+                if (Array.isArray(cicloRows) && cicloRows.length) {
+                    const id_ciclo_activo = cicloRows[0].id_ciclo;
+                    const ecRows = await query(`SELECT id_empleado_ciclo, id_kit FROM empleado_ciclo WHERE id_ciclo = ? AND id_empleado = ? LIMIT 1`, [id_ciclo_activo, id_empleado]);
+                    if (Array.isArray(ecRows) && ecRows.length) {
+                        const ec = ecRows[0];
+                        await query(
+                            `UPDATE empleado_ciclo SET estado = 'entregado', fecha_entrega_real = ?, fecha_actualizacion = NOW(), observaciones = COALESCE(?, observaciones) WHERE id_empleado_ciclo = ?`,
+                            [fecha_entrega, observaciones || null, ec.id_empleado_ciclo]
+                        );
+                    }
+                }
+            } catch (syncErr) {
+                console.error('[registrarEntrega] Error sincronizando con ciclo:', syncErr && syncErr.message);
+            }
+
             res.status(201).json({
                 success: true,
                 data: { id_entrega: result.insertId },
@@ -968,14 +1093,16 @@ class DotacionesController {
                 ) t`;
             const [{ total: total_entregas = 0 }] = await query(totalEntSql);
 
+            // Próximas entregas (redefinición): cantidad de empleados "procesado" en el ciclo ACTIVO
+            // Se considera ciclo activo cuando su ventana está vigente y estado='activo'
             const proximasSql = `
                 SELECT COUNT(*) AS total
-                FROM (
-                    SELECT ed.id_empleado, DATE(ed.fecha_entrega) AS f
-                    FROM entregadotacion ed
-                    WHERE DATEDIFF(DATE_ADD(ed.fecha_entrega, INTERVAL 4 MONTH), CURDATE()) BETWEEN 0 AND 30
-                    GROUP BY ed.id_empleado, DATE(ed.fecha_entrega)
-                ) t`;
+                FROM empleado_ciclo ec
+                INNER JOIN ciclo_dotacion cd ON ec.id_ciclo = cd.id_ciclo
+                WHERE ec.estado = 'procesado'
+                  AND cd.estado = 'activo'
+                  AND CURDATE() BETWEEN cd.fecha_inicio_ventana AND cd.fecha_fin_ventana
+            `;
             const [{ total: proximas_entregas = 0 }] = await query(proximasSql);
 
             const kpis = {

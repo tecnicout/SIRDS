@@ -13,6 +13,15 @@ const TableRowActions = ({
   disabledActions = [],
   processingAction = null
 }) => {
+  const isActive = () => {
+    if (row == null) return false;
+    // Prioridad: usuario_activo (usuarios) > activo > estado (truthy)
+    if (typeof row.usuario_activo !== 'undefined') return !!row.usuario_activo;
+    if (typeof row.activo !== 'undefined') return !!row.activo;
+    if (typeof row.estado !== 'undefined') return !!row.estado;
+    return false;
+  };
+
   const handleAction = (actionName) => {
     if (disabledActions.includes(actionName) || processingAction === actionName) {
       return;
@@ -48,7 +57,7 @@ const TableRowActions = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
       ),
-      toggle: (row.estado ?? row.activo) ? (
+      toggle: isActive() ? (
         // Ícono para desactivar - toggle OFF
         <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
           <path d="M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zM7 15c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/>
@@ -73,7 +82,7 @@ const TableRowActions = ({
       view: 'text-gray-600 hover:text-gray-900',
       edit: 'text-[#B39237] hover:text-[#D4AF37]',
       delete: 'text-[#B39237] hover:text-[#D4AF37]',
-      toggle: (row.estado ?? row.activo)
+      toggle: isActive()
         ? 'text-[#B39237] hover:text-[#D4AF37] transition-colors' 
         : 'text-gray-400 hover:text-gray-600 transition-colors'
     };
@@ -85,7 +94,7 @@ const TableRowActions = ({
       view: 'Ver detalles',
       edit: 'Editar registro',
       delete: 'Eliminar registro',
-      toggle: (row.estado ?? row.activo) ? 'Desactivar' : 'Activar'
+      toggle: isActive() ? 'Desactivar' : 'Activar'
     };
     return titles[action] || action;
   };
@@ -109,16 +118,33 @@ const TableRowActions = ({
       })}
       
       {/* Acciones personalizadas */}
-      {customActions.map((customAction, index) => (
-        <button
-          key={`custom-${index}`}
-          onClick={() => handleAction(customAction.name)}
-          className={customAction.className || 'text-gray-600 hover:text-gray-900 transition-colors'}
-          title={customAction.title || customAction.name}
-        >
-          {customAction.icon}
-        </button>
-      ))}
+          {customActions
+            .filter((customAction) => {
+              // Soporte para condición opcional (como definido en CiclosColumnConfig)
+              try {
+                return typeof customAction.condition === 'function' ? customAction.condition(row) : true;
+              } catch (e) {
+                console.warn('[TableRowActions] condición falló:', e);
+                return true;
+              }
+            })
+            .map((customAction, index) => {
+              const actionName = customAction.name || customAction.id; // Compatibilidad con ambos nombres
+              const title = customAction.title || customAction.label || actionName;
+              const iconNode = typeof customAction.icon === 'string'
+                ? <i className={`bx ${customAction.icon} text-xl`}></i>
+                : customAction.icon;
+              return (
+                <button
+                  key={`custom-${index}`}
+                  onClick={() => handleAction(actionName)}
+                  className={customAction.className || 'text-gray-600 hover:text-gray-900 transition-colors'}
+                  title={title}
+                >
+                  {iconNode}
+                </button>
+              );
+            })}
     </div>
   );
 };

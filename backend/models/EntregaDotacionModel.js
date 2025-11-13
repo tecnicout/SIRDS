@@ -42,7 +42,7 @@ class EntregaDotacionModel {
                 FROM empleado_ciclo ec
                 INNER JOIN empleado e ON ec.id_empleado = e.id_empleado
                 INNER JOIN area a ON e.id_area = a.id_area
-                INNER JOIN kitdotacion k ON ec.id_kit = k.id_kit
+                LEFT JOIN kitdotacion k ON ec.id_kit = k.id_kit
                 INNER JOIN ciclo_dotacion cd ON ec.id_ciclo = cd.id_ciclo
                 LEFT JOIN usuario u ON ec.actualizado_por = u.id_usuario
                 WHERE ec.id_ciclo = ?

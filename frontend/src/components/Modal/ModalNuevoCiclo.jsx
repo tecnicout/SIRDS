@@ -163,7 +163,14 @@ const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
       const result = await response.json();
       
       if (response.ok && result.success) {
-        alert(`Ciclo creado exitosamente con ${result.data?.empleados_asignados || 0} empleados elegibles`);
+        const asignados = result.data?.empleados_asignados || 0;
+        const elegibles = result.data?.total_elegibles || result.data?.elegibles_detectados || asignados;
+        const diferencia = result.data?.diferencia_elegibles;
+        let msg = `Ciclo creado exitosamente. Elegibles detectados: ${elegibles}. Insertados: ${asignados}.`;
+        if (diferencia && diferencia > 0) {
+          msg += ` (Faltan ${diferencia} por falta de kit activo en su área)\nUse el botón "Reasignar kits" en Entregas si ya creó los kits.`;
+        }
+        alert(msg);
         resetForm();
         if (onCicloCreado) onCicloCreado();
         onClose();
@@ -376,7 +383,7 @@ const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
                   <div>
                     <p className="text-sm text-gray-600">Total Elegibles</p>
                     <p className="text-3xl font-bold text-[#B39237] mt-1">
-                      {previewData.total_empleados || 0}
+                      {previewData.total_elegibles || previewData.total_empleados || 0}
                     </p>
                   </div>
                   <i className='bx bx-user-check text-4xl text-[#B39237]'></i>
@@ -419,8 +426,32 @@ const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
               </div>
             )}
 
+            {/* Listado de no elegibles */}
+            {Array.isArray(previewData.no_elegibles) && previewData.no_elegibles.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-bold text-red-700 mb-2 flex items-center gap-2">
+                  <i className='bx bx-user-x'></i>
+                  No elegibles ({previewData.total_no_elegibles || previewData.no_elegibles.length})
+                </h4>
+                <div className="max-h-56 overflow-auto border border-red-200 rounded-xl bg-red-50 p-3">
+                  <ul className="space-y-2 text-sm">
+                    {previewData.no_elegibles.map(emp => (
+                      <li key={emp.id_empleado} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-red-800">
+                          <i className='bx bx-block'></i>
+                          <span className="font-semibold">{emp.nombre_completo}</span>
+                          <span className="text-red-700">• {emp.nombre_area}</span>
+                        </div>
+                        <span className="text-xs text-red-700">{emp.motivo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             {/* Mensaje si no hay empleados elegibles */}
-            {previewData.total_empleados === 0 && (
+            {(previewData.total_elegibles ?? previewData.total_empleados) === 0 && (
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
                 <i className='bx bx-user-x text-5xl text-gray-400 mb-2'></i>
                 <p className="text-gray-600 font-semibold">No hay empleados elegibles para este ciclo</p>

@@ -142,7 +142,38 @@ router.post('/entregar', authMiddleware, async (req, res) => {
 		}
 
 		const legacy = await registrar({ id_empleado, id_kit, fecha_entrega, observaciones, detalles, tallas_por_item, id_talla, id_genero, sinTallaId });
-		return res.json({ success: legacy.success, data: legacy.payload, message: legacy.message });
+
+		// --- Sincronizar entrega con ciclo activo ---
+		// Objetivo: al registrar entrega de kit, marcar estado 'entregado' en empleado_ciclo
+		// y asegurar id_kit asociado para que las estadísticas del ciclo (entregados, procesados) reflejen el cambio.
+		try {
+			// 1) Obtener ciclo activo (el mismo criterio que otros modelos: estado = 'activo')
+			const cicloRows = await query(`SELECT id_ciclo FROM ciclo_dotacion WHERE estado = 'activo' ORDER BY id_ciclo DESC LIMIT 1`);
+			if (Array.isArray(cicloRows) && cicloRows.length > 0) {
+				const id_ciclo_activo = cicloRows[0].id_ciclo;
+				// 2) Localizar registro empleado_ciclo
+				const ecRows = await query(`SELECT id_empleado_ciclo, estado, id_kit FROM empleado_ciclo WHERE id_ciclo = ? AND id_empleado = ? LIMIT 1`, [id_ciclo_activo, id_empleado]);
+				if (Array.isArray(ecRows) && ecRows.length > 0) {
+					const ec = ecRows[0];
+					// 3) Actualizar estado -> 'entregado' solo si aún no está entregado; set id_kit si falta
+					// Nota: mantenemos otros estados 'omitido' si existiera, pero priorizamos marcar entrega real.
+					const nuevoKitId = ec.id_kit || id_kit || null;
+					await query(`UPDATE empleado_ciclo SET estado = 'entregado', id_kit = ?, fecha_entrega_real = CURDATE(), fecha_actualizacion = NOW(), actualizado_por = ?, observaciones = COALESCE(?, observaciones) WHERE id_empleado_ciclo = ?`, [nuevoKitId, (req.usuario && req.usuario.id_usuario) || null, observaciones || null, ec.id_empleado_ciclo]);
+					// 4) Opcional: devolver flag indicando sincronización
+					return res.json({ success: true, data: { ciclo_sync: true }, message: `${legacy.message} y sincronizado con ciclo activo` });
+				} else {
+					// No existe registro en empleado_ciclo (posible empleado fuera del ciclo actual)
+					return res.json({ success: legacy.success, data: { ciclo_sync: false }, message: `${legacy.message}. (Empleado no está en ciclo activo)` });
+				}
+			} else {
+				// Sin ciclo activo
+				return res.json({ success: legacy.success, data: { ciclo_sync: false }, message: `${legacy.message}. (No hay ciclo activo)` });
+			}
+		} catch (syncErr) {
+			console.error('[kitRoutes:/entregar] Error sincronizando con ciclo:', syncErr.message);
+			// Devolver éxito de entrega aunque falle sincronización para no bloquear operación principal
+			return res.json({ success: legacy.success, data: { ciclo_sync: false, error_sync: syncErr.message }, message: `${legacy.message}. (Error al sincronizar ciclo)` });
+		}
 	} catch (error) {
 		console.error('Error al registrar entrega del kit:', error);
 		return res.status(500).json({ success: false, message: 'Error al registrar entrega del kit', error: error.message });

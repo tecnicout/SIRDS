@@ -1,6 +1,8 @@
 ﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import DataTable from '../components/DataTable/DataTable';
 import { Modal, EditModal } from '../components/Modal';
+import ResourceHeader from '../components/UI/ResourceHeader';
+import CardPanel from '../components/UI/CardPanel';
 
 // Configuración de columnas para la tabla de empleados
 const EMPLEADOS_COLUMNS = [
@@ -645,7 +647,7 @@ export default function Empleados() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6 max-w-full overflow-hidden">
+    <div className="space-y-6 overflow-hidden">
       {/* Toast Notification Mejorado */}
       {toast.show && (
         <div 
@@ -689,59 +691,28 @@ export default function Empleados() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-700">Gestión de Empleados</h1>
-          <p className="text-sm md:text-base text-gray-600">Administra la información de los empleados de Arroz Sonora</p>
-        </div>
-      </div>
+      {/* Encabezado y métricas */}
+      <ResourceHeader
+        title="Gestión de Empleados"
+        subtitle="Administra la información de los empleados de Arroz Sonora"
+        stats={[
+          { icon: 'bx-group', label: 'Total', value: empleados.length },
+          { icon: 'bx-check-circle', label: 'Activos', value: empleados.filter(emp => emp.estado).length },
+          { icon: 'bx-x-circle', label: 'Inactivos', value: empleados.filter(emp => !emp.estado).length }
+        ]}
+        action={(
+          <button
+            onClick={handleCrearEmpleado}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#D4AF37] to-[#B39237] hover:from-[#B39237] hover:to-[#9C7F2F] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[#E2BE69] focus:ring-offset-2"
+          >
+            <i className="bx bx-plus"></i>
+            Nuevo Empleado
+          </button>
+        )}
+      />
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
-        <div className="bg-white p-4 md:p-6 rounded-lg shadow border">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs md:text-sm font-medium text-gray-600">Total Empleados</p>
-              <p className="text-xl md:text-2xl font-bold text-gray-600">{empleados.length}</p>
-            </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              <i className="bx bx-group text-xl md:text-2xl text-gray-600"></i>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 md:p-6 rounded-lg shadow border">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs md:text-sm font-medium text-gray-600">Empleados Activos</p>
-              <p className="text-xl md:text-2xl font-bold text-[#B39237]">
-                {empleados.filter(emp => emp.estado).length}
-              </p>
-            </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-[#B39237] to-[#D4AF37] rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
-              <i className="bx bx-check-circle text-xl md:text-2xl text-white"></i>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 md:p-6 rounded-lg shadow border">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs md:text-sm font-medium text-gray-600">Empleados Inactivos</p>
-              <p className="text-xl md:text-2xl font-bold text-gray-600">
-                {empleados.filter(emp => !emp.estado).length}
-              </p>
-            </div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-400 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
-              <i className="bx bx-x-circle text-xl md:text-2xl text-white"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros simplificados */}
-      <div className="bg-white p-4 md:p-6 rounded-lg shadow border">
+      {/* Filtros */}
+      <CardPanel title="Filtros" icon="bx-filter">
         <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-3 md:gap-4 md:items-end">
           {/* Búsqueda principal */}
           <div className="md:col-span-2">
@@ -784,29 +755,29 @@ export default function Empleados() {
             </select>
           </div>
         </div>
-      </div>
+      </CardPanel>
 
       {/* Tabla de empleados */}
-      <div className="bg-white rounded-lg shadow border overflow-hidden">
-        <div className="overflow-x-auto">
-        <div className="p-4 md:p-6 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <h2 className="text-lg md:text-xl font-semibold text-gray-700">Lista de Empleados</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Mostrando {startIndex + 1} a {Math.min(endIndex, empleadosFiltrados.length)} de {empleadosFiltrados.length} empleados
-              </p>
-            </div>
+      <CardPanel
+        title="Lista de Empleados"
+        icon="bx-spreadsheet"
+        actions={(
+          <div className="hidden sm:block">
             <button
               onClick={handleCrearEmpleado}
-              className="bg-gradient-to-r from-[#B39237] to-[#D4AF37] text-white px-4 py-3 md:py-2 text-sm md:text-base rounded-lg hover:from-[#A0812F] hover:to-[#C19B2F] transition-all duration-200 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg w-full sm:w-auto"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-[#B39237] to-[#D4AF37] text-white px-4 py-2 rounded-lg hover:from-[#A0812F] hover:to-[#C19B2F] transition-all duration-200 shadow-md"
             >
-              <i className="bx bx-plus text-lg md:text-xl"></i>
-              <span className="font-medium">Nuevo Empleado</span>
+              <i className="bx bx-plus"></i>
+              <span>Nuevo</span>
             </button>
           </div>
+        )}
+      >
+        <div className="border-b border-gray-200 px-5 py-3 text-sm text-gray-600">
+          Mostrando {startIndex + 1} a {Math.min(endIndex, empleadosFiltrados.length)} de {empleadosFiltrados.length} empleados
         </div>
 
+        <div className="overflow-x-auto">
           <DataTable
             data={empleadosPaginados}
             columns={EMPLEADOS_COLUMNS}
@@ -822,14 +793,13 @@ export default function Empleados() {
 
         {/* Paginador */}
         {totalPages > 1 && (
-          <div className="px-4 md:px-6 py-4 border-t border-gray-200">
+          <div className="px-5 py-4 border-t border-gray-200">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="text-xs md:text-sm text-gray-700 text-center sm:text-left">
                 Mostrando {startIndex + 1} a {Math.min(endIndex, empleadosFiltrados.length)} de {empleadosFiltrados.length} empleados
               </div>
               
               <div className="flex items-center justify-center space-x-1 md:space-x-2">
-                {/* Botón página anterior */}
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
@@ -842,7 +812,6 @@ export default function Empleados() {
                   <i className="bx bx-chevron-left text-lg"></i>
                 </button>
 
-                {/* Números de página */}
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                   <button
                     key={page}
@@ -857,7 +826,6 @@ export default function Empleados() {
                   </button>
                 ))}
 
-                {/* Botón página siguiente */}
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
@@ -873,7 +841,7 @@ export default function Empleados() {
             </div>
           </div>
         )}
-      </div>
+      </CardPanel>
 
       {/* Modal de vista detallada */}
       {showViewModal && selectedEmpleado && (

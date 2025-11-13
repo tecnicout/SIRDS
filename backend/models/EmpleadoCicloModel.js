@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const { pool, query, getConnection } = require('../config/database');
 
 class EmpleadoCicloModel {
   /**
@@ -6,20 +6,35 @@ class EmpleadoCicloModel {
    */
   static async getByCiclo(id_ciclo, page = 1, limit = 20, filters = {}) {
     try {
-      const offset = (page - 1) * limit;
-      let query = `
+      const validPage = parseInt(page) || 1;
+      const validLimit = parseInt(limit) || 20;
+      const offset = (validPage - 1) * validLimit;
+      let sql = `
         SELECT 
-          ec.*,
-          e.Identificacion,
+          ec.id_empleado_ciclo,
+          ec.id_ciclo,
+          ec.id_empleado,
+          ec.id_kit,
+          ec.estado,
+          ec.antiguedad_meses,
+          ec.sueldo_al_momento,
+          ec.id_area,
+          ec.observaciones,
+          ec.fecha_asignacion,
+          ec.fecha_entrega_real,
+          ec.fecha_actualizacion,
+          e.Identificacion AS documento,
           e.nombre,
           e.apellido,
           e.email,
           e.cargo,
           a.nombre_area,
+          k.nombre AS nombre_kit,
           CONCAT(e.nombre, ' ', e.apellido) as nombre_completo
         FROM empleado_ciclo ec
         INNER JOIN empleado e ON ec.id_empleado = e.id_empleado
         INNER JOIN area a ON ec.id_area = a.id_area
+        LEFT JOIN kitdotacion k ON ec.id_kit = k.id_kit
         WHERE ec.id_ciclo = ?
       `;
       
@@ -27,32 +42,39 @@ class EmpleadoCicloModel {
 
       // Filtros
       if (filters.estado) {
-        query += ' AND ec.estado = ?';
+        sql += ' AND ec.estado = ?';
         params.push(filters.estado);
       }
 
       if (filters.area) {
-        query += ' AND ec.id_area = ?';
+        sql += ' AND ec.id_area = ?';
         params.push(filters.area);
       }
 
-      query += ' ORDER BY a.nombre_area, e.apellido, e.nombre LIMIT ? OFFSET ?';
-      params.push(limit, offset);
+  // Evitar placeholders para LIMIT/OFFSET (previene ER_WRONG_ARGUMENTS en algunos motores)
+  sql += ` ORDER BY a.nombre_area, e.apellido, e.nombre LIMIT ${validLimit} OFFSET ${offset}`;
 
-      const [rows] = await pool.query(query, params);
+  const rows = await query(sql, params);
 
       // Contar total
-      const [countResult] = await pool.query(
-        'SELECT COUNT(*) as total FROM empleado_ciclo WHERE id_ciclo = ?',
-        [id_ciclo]
-      );
+      let countSql = 'SELECT COUNT(*) as total FROM empleado_ciclo WHERE id_ciclo = ?';
+      const countParams = [id_ciclo];
+      if (filters.estado) {
+        countSql += ' AND estado = ?';
+        countParams.push(filters.estado);
+      }
+      if (filters.area) {
+        countSql += ' AND id_area = ?';
+        countParams.push(filters.area);
+      }
+      const countResult = await query(countSql, countParams);
 
       return {
         data: rows,
         total: countResult[0].total,
-        page,
-        limit,
-        totalPages: Math.ceil(countResult[0].total / limit)
+        page: validPage,
+        limit: validLimit,
+        totalPages: Math.ceil(countResult[0].total / validLimit)
       };
     } catch (error) {
       throw new Error(`Error al obtener empleados del ciclo: ${error.message}`);
@@ -73,7 +95,7 @@ class EmpleadoCicloModel {
     } = data;
 
     try {
-      const [result] = await pool.query(
+      const result = await query(
         `INSERT INTO empleado_ciclo (
           id_ciclo, id_empleado, estado, antiguedad_meses,
           sueldo_al_momento, id_area, observaciones
@@ -93,7 +115,7 @@ class EmpleadoCicloModel {
    * Agregar múltiples empleados a un ciclo
    */
   static async createBatch(id_ciclo, empleados) {
-    const connection = await pool.getConnection();
+  const connection = await getConnection();
     
     try {
       await connection.beginTransaction();
@@ -103,7 +125,7 @@ class EmpleadoCicloModel {
 
       for (const emp of empleados) {
         try {
-          const [result] = await connection.query(
+          const [result] = await connection.execute(
             `INSERT INTO empleado_ciclo (
               id_ciclo, id_empleado, estado, antiguedad_meses,
               sueldo_al_momento, id_area
@@ -144,7 +166,7 @@ class EmpleadoCicloModel {
     try {
       const fecha_entrega_real = estado === 'entregado' ? new Date().toISOString().split('T')[0] : null;
 
-      const [result] = await pool.query(
+      const result = await query(
         `UPDATE empleado_ciclo 
          SET estado = ?,
              fecha_entrega_real = ?,
@@ -164,8 +186,8 @@ class EmpleadoCicloModel {
    */
   static async calcularElegibles(id_area_produccion, id_area_mercadista, smlv_valor) {
     try {
-      // Usar helper query que devuelve directamente un arreglo de filas
-      const empleados = await pool.query(
+      // Devolver SIEMPRE arreglo de filas (desestructurar pool.query)
+      const empleados = await query(
         `SELECT 
           e.id_empleado,
           e.Identificacion,
@@ -207,16 +229,206 @@ class EmpleadoCicloModel {
           smlv_valor
         ]
       );
-      // Normalizar a arreglo en caso de resultados inesperados
-      if (!Array.isArray(empleados)) {
-        console.warn('[calcularElegibles] Resultado no es array. Normalizando a []');
-        return [];
-      }
-      return empleados;
+      return Array.isArray(empleados) ? empleados : [];
     } catch (error) {
       // No propagar excepción; mantener contrato devolviendo arreglo vacío
       console.error('[calcularElegibles] Error SQL:', error.message);
       return [];
+    }
+  }
+
+  /**
+   * Listar todos los candidatos (elegibles y no elegibles) sin filtrar por sueldo ni antigüedad.
+   * Devuelve flags para clasificar en frontend.
+   */
+  static async obtenerCandidatosCiclo(id_area_produccion, id_area_mercadista, smlv_valor) {
+    try {
+      const candidatos = await query(
+        `SELECT 
+          e.id_empleado,
+          e.Identificacion,
+          e.nombre,
+          e.apellido,
+          CONCAT(e.nombre, ' ', e.apellido) as nombre_completo,
+          e.email,
+          e.cargo,
+          e.fecha_inicio,
+          e.sueldo,
+          e.id_area,
+          a.nombre_area,
+          TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses,
+          ROUND(e.sueldo / ?, 2) as multiplo_smlv,
+          CASE 
+            WHEN TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) >= 3 THEN TRUE
+            ELSE FALSE
+          END as cumple_antiguedad,
+          CASE 
+            WHEN e.sueldo >= ? AND e.sueldo <= (? * 2) THEN TRUE
+            ELSE FALSE
+          END as cumple_sueldo
+        FROM empleado e
+        INNER JOIN area a ON e.id_area = a.id_area
+        WHERE e.estado = 1
+          AND e.id_area IN (?, ?)
+          AND e.sueldo > 0
+        ORDER BY a.nombre_area, e.apellido, e.nombre`,
+        [
+          smlv_valor,
+          smlv_valor,
+          smlv_valor,
+          id_area_produccion,
+          id_area_mercadista
+        ]
+      );
+      return Array.isArray(candidatos) ? candidatos : [];
+    } catch (error) {
+      console.error('[obtenerCandidatosCiclo] Error SQL:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Obtener todos los candidatos (toda la tabla empleado) sin restricción de área.
+   * Incluye flags para evaluar elegibilidad por antigüedad y rango salarial.
+   */
+  static async obtenerCandidatosGlobal(smlv_valor) {
+    try {
+      const candidatos = await query(
+        `SELECT 
+          e.id_empleado,
+          e.Identificacion,
+          e.nombre,
+          e.apellido,
+          CONCAT(e.nombre, ' ', e.apellido) as nombre_completo,
+          e.email,
+          e.cargo,
+          e.fecha_inicio,
+          e.sueldo,
+          e.id_area,
+          a.nombre_area,
+          TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses,
+          ROUND(e.sueldo / ?, 2) as multiplo_smlv,
+          CASE 
+            WHEN TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) >= 3 THEN TRUE
+            ELSE FALSE
+          END as cumple_antiguedad,
+          CASE 
+            WHEN e.sueldo >= ? AND e.sueldo <= (? * 2) THEN TRUE
+            ELSE FALSE
+          END as cumple_sueldo
+        FROM empleado e
+        INNER JOIN area a ON e.id_area = a.id_area
+        WHERE e.estado = 1 AND e.sueldo > 0
+        ORDER BY a.nombre_area, e.apellido, e.nombre`,
+        [smlv_valor, smlv_valor, smlv_valor]
+      );
+      return Array.isArray(candidatos) ? candidatos : [];
+    } catch (error) {
+      console.error('[obtenerCandidatosGlobal] Error SQL:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Calcular SOLO empleados elegibles a nivel global (sin restricción de áreas)
+   * Criterios: antigüedad >= 3 meses y sueldo entre [1 SMLV, 2 SMLV]
+   */
+  static async calcularElegiblesGlobal(smlv_valor) {
+    try {
+      const rows = await query(
+        `SELECT 
+          e.id_empleado,
+          e.Identificacion,
+          e.nombre,
+          e.apellido,
+          CONCAT(e.nombre, ' ', e.apellido) as nombre_completo,
+          e.email,
+          e.cargo,
+          e.fecha_inicio,
+          e.sueldo,
+          e.id_area,
+          a.nombre_area,
+          TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses,
+          ROUND(e.sueldo / ?, 2) as multiplo_smlv
+        FROM empleado e
+        INNER JOIN area a ON e.id_area = a.id_area
+        WHERE e.estado = 1
+          AND e.sueldo > 0
+          AND TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) >= 3
+          AND e.sueldo <= (? * 2)
+        ORDER BY a.nombre_area, e.apellido, e.nombre`,
+        [smlv_valor, smlv_valor]
+      );
+      return Array.isArray(rows) ? rows : [];
+    } catch (error) {
+      console.error('[calcularElegiblesGlobal] Error SQL:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Inserta en una sola sentencia todos los elegibles globales al ciclo indicado.
+   * Previene duplicados dentro del mismo ciclo.
+   * Retorna { insertados, afectados }
+   */
+  static async insertElegiblesGlobalBatch(id_ciclo, smlv_valor) {
+    const connection = await getConnection();
+    try {
+      await connection.beginTransaction();
+      const [result] = await connection.execute(
+        `INSERT INTO empleado_ciclo (
+            id_ciclo, id_empleado, id_kit, estado, antiguedad_meses, sueldo_al_momento, id_area
+         )
+         SELECT ?, e.id_empleado, k.id_kit, 'procesado',
+                TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses,
+                e.sueldo, e.id_area
+         FROM empleado e
+         INNER JOIN area a ON e.id_area = a.id_area
+         LEFT JOIN kitdotacion k ON k.id_area = a.id_area AND k.activo = 1
+         WHERE e.estado = 1
+           AND e.sueldo > 0
+           AND TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) >= 3
+           AND e.sueldo <= (? * 2)
+           AND NOT EXISTS (
+              SELECT 1 FROM empleado_ciclo ec
+              WHERE ec.id_ciclo = ? AND ec.id_empleado = e.id_empleado
+           )`,
+        [id_ciclo, smlv_valor, id_ciclo]
+      );
+      await connection.commit();
+      return { insertados: Number(result.affectedRows || 0), afectados: Number(result.affectedRows || 0) };
+    } catch (error) {
+      await connection.rollback();
+      console.error('[insertElegiblesGlobalBatch] Error SQL:', error.message);
+      return { insertados: 0, afectados: 0, error: error.message };
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * Backfill para ciclos existentes: asigna id_kit a registros de empleado_ciclo con id_kit NULL
+   * cruzando por área contra kitdotacion activo.
+   */
+  static async backfillKitsPorArea(id_ciclo) {
+    const connection = await getConnection();
+    try {
+      await connection.beginTransaction();
+      const [result] = await connection.execute(
+        `UPDATE empleado_ciclo ec
+         INNER JOIN kitdotacion k ON k.id_area = ec.id_area AND k.activo = 1
+         SET ec.id_kit = k.id_kit
+         WHERE ec.id_ciclo = ? AND ec.id_kit IS NULL`,
+        [id_ciclo]
+      );
+      await connection.commit();
+      return Number(result.affectedRows || 0);
+    } catch (error) {
+      await connection.rollback();
+      console.error('[backfillKitsPorArea] Error SQL:', error.message);
+      return 0;
+    } finally {
+      connection.release();
     }
   }
 
@@ -263,7 +475,7 @@ class EmpleadoCicloModel {
   static async delete(id_empleado_ciclo) {
     try {
       // Verificar estado
-      const [empleado] = await pool.query(
+      const empleado = await query(
         'SELECT estado FROM empleado_ciclo WHERE id_empleado_ciclo = ?',
         [id_empleado_ciclo]
       );
@@ -276,7 +488,7 @@ class EmpleadoCicloModel {
         throw new Error('Solo se pueden eliminar empleados en estado "procesado"');
       }
 
-      const [result] = await pool.query(
+      const result = await query(
         'DELETE FROM empleado_ciclo WHERE id_empleado_ciclo = ?',
         [id_empleado_ciclo]
       );
@@ -291,7 +503,7 @@ class EmpleadoCicloModel {
    */
   static async getHistorialEmpleado(id_empleado) {
     try {
-      const [historial] = await pool.query(
+      const historial = await query(
         `SELECT 
           ec.*,
           cd.nombre_ciclo,
