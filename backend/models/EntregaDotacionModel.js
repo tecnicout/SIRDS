@@ -36,7 +36,7 @@ class EntregaDotacionModel {
                     e.identificacion,
                     e.cargo,
                     a.nombre_area,
-                    k.nombre as nombre_kit,
+                    COALESCE(k.nombre, 'Sin kit asignado') as nombre_kit,
                     u.username as actualizado_por_nombre,
                     cd.fecha_entrega as fecha_entrega_programada
                 FROM empleado_ciclo ec

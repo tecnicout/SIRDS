@@ -314,7 +314,7 @@ const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
             )}
             <p className="mt-2 text-xs text-gray-500">
               <i className='bx bx-info-circle text-sm mr-1'></i>
-              La ventana de ejecución será 1 mes antes de esta fecha
+              La ventana de ejecución será 2 meses antes de esta fecha
             </p>
           </div>
 

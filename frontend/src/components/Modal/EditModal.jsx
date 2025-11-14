@@ -59,14 +59,16 @@ const EditModal = ({
       // Para el campo estado, mantener como número entero (1 o 0)
       // Solo convertir si el valor no está vacío
       processedValue = value !== '' ? parseInt(value, 10) : '';
-    } else if (name === 'id_genero' || name === 'id_area') {
+    } else if (name === 'id_genero' || name === 'id_area' || name === 'id_kit') {
       // Para campos de ID, convertir a número entero
       processedValue = value ? parseInt(value, 10) : '';
     }
 
     setFormData(prev => ({
       ...prev,
-      [name]: processedValue
+      [name]: processedValue,
+      // Si cambia el área, reiniciar el kit seleccionado para evitar inconsistencias
+      ...(name === 'id_area' ? { id_kit: '' } : {})
     }));
 
     // Limpiar error del campo modificado
@@ -213,6 +215,17 @@ EditModal.Form = ({
       error ? 'border-red-400 bg-red-50/30' : 'border-gray-300 hover:border-gray-400'
     }`;
 
+    // Resolver opciones dinámicas (p.ej., kits por área)
+    let dynamicOptions = field.options;
+    if (field.name === 'id_kit' && Array.isArray(field.optionsAll)) {
+      const currentArea = formData.id_area ?? '';
+      if (currentArea !== '') {
+        dynamicOptions = field.optionsAll.filter(opt => String(opt.id_area) === String(currentArea));
+      } else {
+        dynamicOptions = [];
+      }
+    }
+
     switch (field.type) {
       case 'select':
         return (
@@ -223,11 +236,12 @@ EditModal.Form = ({
             onChange={onChange}
             className={baseInputClass}
             required={field.required}
+            disabled={field.name === 'id_kit' && (formData.id_area === '' || formData.id_area === undefined || formData.id_area === null)}
           >
             {field.placeholder && (
               <option value="">{field.placeholder}</option>
             )}
-            {field.options?.map(option => (
+            {(dynamicOptions || field.options)?.map(option => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -398,6 +412,15 @@ export const EMPLEADO_FORM_FIELDS = [
     type: 'select',
     required: true,
     placeholder: 'Seleccionar área',
+    fullWidth: false,
+    options: [] // Se llenará dinámicamente
+  },
+  {
+    name: 'id_kit',
+    label: 'Kit asignado (opcional)',
+    type: 'select',
+    required: false,
+    placeholder: 'Seleccionar kit (opcional)',
     fullWidth: false,
     options: [] // Se llenará dinámicamente
   },

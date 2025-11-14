@@ -17,6 +17,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import CountdownWheels from './components/CountdownWheels';
 const LazyBlurText = lazy(() => import('./components/BlurText'));
 
 // Componente de Login Page
@@ -369,6 +370,18 @@ function App() {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
+  // Limpiar token al cerrar la pestaña/ventana (evita sesión persistente tras cerrar)
+  useEffect(() => {
+    const clearOnUnload = () => {
+      try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } catch (_) { /* noop */ }
+    };
+    window.addEventListener('beforeunload', clearOnUnload);
+    return () => window.removeEventListener('beforeunload', clearOnUnload);
+  }, []);
+
   // Detectar cuando se cierra la ventana/pestaña para limpiar datos sensibles
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -683,7 +696,7 @@ function PublicRegistrarModal({ onClose }) {
       <div className="bg-white always-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden ring-1 ring-gray-200">
         <div className="bg-[#B39237] text-white px-6 py-4 flex justify-between items-center">
           <div>
-            <h2 className="text-lg font-semibold">Registrar Dotación (Tallas)</h2>
+            <h2 className="text-lg font-semibold">Actualizar Dotación (Tallas)</h2>
             <p className="text-xs">Ingresa documento, ajusta tallas y guarda preferencias.</p>
           </div>
           <button onClick={onClose} className="p-2 hover:opacity-80" aria-label="Cerrar">
@@ -749,9 +762,33 @@ function PublicRegistrarModal({ onClose }) {
 }
 
 function LandingPage() {
+  const [nextDelivery, setNextDelivery] = React.useState({ loading: true, data: null, error: null });
   const [showRegistrarModal, setShowRegistrarModal] = React.useState(false);
   const openRegistrar = () => setShowRegistrarModal(true);
   const closeRegistrar = () => setShowRegistrarModal(false);
+
+  React.useEffect(() => {
+    let timeoutId;
+    const fetchDelivery = async () => {
+      try {
+        const response = await fetch('/api/public/proxima-entrega');
+        const json = await response.json();
+        if (json.success && json.data) {
+          setNextDelivery({ loading: false, data: json.data, error: null });
+        } else {
+          setNextDelivery({ loading: false, data: null, error: json.message || 'Aún no hay fecha de entrega programada' });
+        }
+      } catch (error) {
+        setNextDelivery({ loading: false, data: null, error: 'No se pudo obtener la próxima entrega' });
+        // Reintentar una vez si falla
+        timeoutId = setTimeout(fetchDelivery, 5000);
+      }
+    };
+    fetchDelivery();
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  const nextDeliveryDate = nextDelivery.data?.fecha_entrega_iso;
   return (
     <>
       {/* Header Principal */}
@@ -785,7 +822,7 @@ function LandingPage() {
                 className="always-white bg-gradient-to-r from-[#D4AF37] to-[#B39237] text-white border-2 border-[#D4AF37] hover:from-[#B39237] hover:to-[#9C7F2F] px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
               >
                 <i className="bx bx-package text-xl"></i>
-                <span>Registrar Dotación</span>
+                <span>Actualiza tu Talla</span>
               </button>
               <a
                 href="/login"
@@ -806,6 +843,25 @@ function LandingPage() {
           
           {/* Contenido centrado a lo largo de toda la pantalla */}
           <div className="text-center">
+            <div className="mb-10">
+              {nextDelivery.loading ? (
+                <p className="text-base md:text-lg text-gray-500">Consultando próxima fecha de entrega...</p>
+              ) : nextDelivery.data ? (
+                <div className="inline-flex flex-col items-center bg-white/70 border border-[#D4AF37] rounded-3xl shadow-lg px-6 py-4 gap-4">
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.2em] text-[#B39237] font-semibold">Próxima entrega de dotación</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {new Date(nextDelivery.data.fecha_entrega_iso).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <CountdownWheels targetDate={nextDeliveryDate} />
+                </div>
+              ) : (
+                <p className="text-base md:text-lg text-gray-500">
+                  {nextDelivery.error || 'Aún no hay fecha de entrega programada'}
+                </p>
+              )}
+            </div>
             <Suspense fallback={
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-gray-900 leading-tight mb-8">
                 <span className="block">Sistema</span>

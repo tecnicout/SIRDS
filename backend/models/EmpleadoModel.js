@@ -8,11 +8,14 @@ class EmpleadoModel {
                 e.*,
                 g.nombre as genero_nombre,
                 a.nombre_area,
-                u.nombre as ubicacion_nombre
+                u.nombre as ubicacion_nombre,
+                e.id_kit,
+                k.nombre AS kit_nombre
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
             LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
+            LEFT JOIN kitdotacion k ON e.id_kit = k.id_kit
             ORDER BY e.apellido, e.nombre
         `;
         return await query(sql);
@@ -26,11 +29,14 @@ class EmpleadoModel {
                 g.nombre as genero_nombre,
                 a.nombre_area,
                 u.nombre as ubicacion_nombre,
-                u.id_ubicacion
+                u.id_ubicacion,
+                e.id_kit,
+                k.nombre AS kit_nombre
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
             LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
+            LEFT JOIN kitdotacion k ON e.id_kit = k.id_kit
             WHERE e.id_empleado = ?
         `;
         const result = await query(sql, [id]);
@@ -42,19 +48,54 @@ class EmpleadoModel {
         const {
             Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
             email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
-            fecha_fin, estado = 1
+            fecha_fin, estado = 1,
+            id_kit = null
         } = empleadoData;
+
+        // Normalizar undefined -> null para todos los campos
+        const safeData = {
+            Identificacion: Identificacion ?? null,
+            tipo_identificacion: tipo_identificacion ?? null,
+            nombre: nombre ?? null,
+            apellido: apellido ?? null,
+            fecha_nacimiento: fecha_nacimiento ?? null,
+            email: email ?? null,
+            telefono: telefono ?? null,
+            cargo: cargo ?? null,
+            estado: estado ?? 1,
+            id_genero: id_genero ?? null,
+            id_area: id_area ?? null,
+            id_ubicacion: id_ubicacion ?? null,
+            fecha_inicio: fecha_inicio ?? null,
+            sueldo: sueldo ?? null,
+            fecha_fin: fecha_fin ?? null,
+            id_kit: id_kit ?? null
+        };
         
         const sql = `
             INSERT INTO Empleado 
             (Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
-             email, telefono, cargo, estado, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, fecha_fin)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             email, telefono, cargo, estado, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, fecha_fin, id_kit)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const params = [
-            Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
-            email, telefono, cargo, estado, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, fecha_fin
+            safeData.Identificacion,
+            safeData.tipo_identificacion,
+            safeData.nombre,
+            safeData.apellido,
+            safeData.fecha_nacimiento,
+            safeData.email,
+            safeData.telefono,
+            safeData.cargo,
+            safeData.estado,
+            safeData.id_genero,
+            safeData.id_area,
+            safeData.id_ubicacion,
+            safeData.fecha_inicio,
+            safeData.sueldo,
+            safeData.fecha_fin,
+            safeData.id_kit
         ];
         
         const result = await query(sql, params);
@@ -67,7 +108,8 @@ class EmpleadoModel {
         const {
             Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
             email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
-            fecha_fin, estado
+            fecha_fin, estado,
+            id_kit = null
         } = empleadoData;
 
         // Convertir undefined a null para compatibilidad con MySQL2
@@ -86,7 +128,8 @@ class EmpleadoModel {
             fecha_inicio: fecha_inicio ?? null,
             sueldo: sueldo ?? null,
             fecha_fin: fecha_fin ?? null,
-            estado: estado ?? 1
+            estado: estado ?? 1,
+            id_kit: id_kit ?? null
         };
         
         const sql = `
@@ -94,7 +137,7 @@ class EmpleadoModel {
             SET Identificacion = ?, tipo_identificacion = ?, nombre = ?, apellido = ?, 
                 fecha_nacimiento = ?, email = ?, telefono = ?, cargo = ?, 
                 id_genero = ?, id_area = ?, id_ubicacion = ?, fecha_inicio = ?, sueldo = ?, 
-                fecha_fin = ?, estado = ?
+                fecha_fin = ?, estado = ?, id_kit = ?
             WHERE id_empleado = ?
         `;
         
@@ -114,6 +157,7 @@ class EmpleadoModel {
             safeData.sueldo,
             safeData.fecha_fin,
             safeData.estado,
+            safeData.id_kit,
             id
         ]);
         
@@ -132,9 +176,12 @@ class EmpleadoModel {
         const sql = `
             SELECT 
                 e.*,
-                g.nombre as genero_nombre
+                g.nombre as genero_nombre,
+                e.id_kit,
+                k.nombre AS kit_nombre
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
+            LEFT JOIN kitdotacion k ON e.id_kit = k.id_kit
             WHERE e.id_area = ? AND e.estado = 1
             ORDER BY e.apellido, e.nombre
         `;
@@ -167,11 +214,14 @@ class EmpleadoModel {
                 g.nombre as genero_nombre,
                 a.nombre_area,
                 u.nombre as ubicacion_nombre,
-                u.id_ubicacion
+                u.id_ubicacion,
+                e.id_kit,
+                k.nombre AS kit_nombre
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
             LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
+            LEFT JOIN kitdotacion k ON e.id_kit = k.id_kit
             WHERE e.email = ? AND e.estado = 1
         `;
         const result = await query(sql, [email]);

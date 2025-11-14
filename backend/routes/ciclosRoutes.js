@@ -37,6 +37,12 @@ router.get('/estadisticas', CiclosController.obtenerEstadisticas);
 router.get('/preview-elegibles', CiclosController.previewEmpleadosElegibles);
 
 /**
+ * GET /api/ciclos/:id/candidatos
+ * Buscar empleados disponibles para agregar manualmente al ciclo
+ */
+router.get('/:id/candidatos', CiclosController.buscarCandidatosCiclo);
+
+/**
  * GET /api/ciclos/:id
  * Obtener detalle de un ciclo específico
  */
@@ -55,6 +61,12 @@ router.post('/', CiclosController.crearCiclo);
  * Body: { estado }
  */
 router.put('/:id/estado', CiclosController.actualizarEstadoCiclo);
+
+/**
+ * POST /api/ciclos/:id/empleados-manual
+ * Agregar un empleado manualmente al ciclo (casos especiales)
+ */
+router.post('/:id/empleados-manual', CiclosController.agregarEmpleadoManual);
 
 /**
  * DELETE /api/ciclos/:id?force=true
@@ -76,6 +88,12 @@ router.get('/:id/empleados', CiclosController.obtenerEmpleadosCiclo);
  * Body: { estado, observaciones? }
  */
 router.put('/empleados/:id_empleado_ciclo', CiclosController.actualizarEstadoEmpleado);
+
+/**
+ * DELETE /api/ciclos/empleados/:id_empleado_ciclo
+ * Eliminar (excluir) un empleado mientras esté procesado
+ */
+router.delete('/empleados/:id_empleado_ciclo', CiclosController.eliminarEmpleadoManual);
 
 // =====================================================
 // RUTAS DE SALARIO MÍNIMO (SMLV)

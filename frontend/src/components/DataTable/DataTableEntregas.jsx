@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
   const [entregas, setEntregas] = useState([]);
@@ -6,7 +6,8 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
   const [filtros, setFiltros] = useState({
     busqueda: '',
     estado: '',
-    area: ''
+    area: '',
+    kit: '' // '', 'con', 'sin'
   });
   const [paginacion, setPaginacion] = useState({
     paginaActual: 1,
@@ -56,25 +57,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
     cargarCicloActivo();
   }, []);
 
-  // Cargar datos (sin bloquear los filtros)
-  useEffect(() => {
-    cargarEntregas();
-  }, [refreshTrigger, debouncedBusqueda, filtros.estado, filtros.area, paginacion.paginaActual]);
-
-  // Cargar áreas solo una vez (o cuando realmente se requiera)
-  useEffect(() => {
-    cargarAreas();
-  }, []);
-
-  // Asegurar que `areas` siempre sea un array (protección adicional)
-  useEffect(() => {
-    if (!Array.isArray(areas)) {
-      const normalized = Array.isArray(areas?.data) ? areas.data : [];
-      setAreas(normalized);
-    }
-  }, [areas]);
-
-  const cargarEntregas = async () => {
+  const cargarEntregas = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
@@ -85,10 +68,10 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
         search: debouncedBusqueda,
         estado: filtros.estado,
         area: filtros.area,
-        compat: '1' // forzar modo compatibilidad basado en entregadotacion
+        kit: filtros.kit,
+        compat: '1'
       });
 
-      // Si hay un ciclo activo, añadir los parámetros de fecha
       if (cicloActivo) {
         queryParams.append('fecha_desde', cicloActivo.fecha_inicio_ventana);
         queryParams.append('fecha_hasta', cicloActivo.fecha_fin_ventana);
@@ -102,10 +85,6 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
 
       if (response.ok) {
         const data = await response.json();
-        // Normalizar distintos formatos de respuesta:
-        // - { success: true, data: [...] }
-        // - { entregas: [...], total: N }
-        // - [...] (array)
         let entregasData = [];
         let total = 0;
 
@@ -117,11 +96,15 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
           total = data.total ?? (Array.isArray(entregasData) ? entregasData.length : 0);
         }
 
-        // Filtro cliente por estado (fallback si el backend no filtra)
         let list = entregasData || [];
         if (filtros.estado) {
           const est = String(filtros.estado).toLowerCase();
           list = list.filter(e => String(e?.estado || '').toLowerCase() === est);
+        }
+        if (filtros.kit) {
+          const kval = String(filtros.kit).toLowerCase();
+          if (kval === 'con') list = list.filter(e => e?.id_kit != null);
+          else if (kval === 'sin') list = list.filter(e => e?.id_kit == null);
         }
 
         setEntregas(list);
@@ -130,14 +113,14 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
           totalItems: filtros.estado ? list.length : total
         }));
       } else {
-        // Intento de respaldo: intentar una vez más en compat (por si el backend no lo soporta aún)
         try {
-          const compatParams = new URLSearchParams({
+            const compatParams = new URLSearchParams({
             page: paginacion.paginaActual,
             limit: paginacion.itemsPorPagina,
             search: filtros.busqueda,
             estado: filtros.estado,
-            area: filtros.area,
+              area: filtros.area,
+              kit: filtros.kit,
             compat: '1'
           });
           const resp2 = await fetch(`http://localhost:3001/api/dotaciones/entregas?${compatParams}`, {
@@ -146,11 +129,15 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
           if (resp2.ok) {
             const data2 = await resp2.json();
             const list2 = Array.isArray(data2?.data) ? data2.data : (Array.isArray(data2?.entregas) ? data2.entregas : []);
-            // Filtro cliente por estado (fallback)
             let list = list2 || [];
             if (filtros.estado) {
               const est = String(filtros.estado).toLowerCase();
               list = list.filter(e => String(e?.estado || '').toLowerCase() === est);
+            }
+            if (filtros.kit) {
+              const kval = String(filtros.kit).toLowerCase();
+              if (kval === 'con') list = list.filter(e => e?.id_kit != null);
+              else if (kval === 'sin') list = list.filter(e => e?.id_kit == null);
             }
             const total2 = data2?.total ?? (Array.isArray(list) ? list.length : 0);
             setEntregas(list);
@@ -170,7 +157,26 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cicloActivo, debouncedBusqueda, filtros.area, filtros.estado, filtros.kit, filtros.busqueda, paginacion.itemsPorPagina, paginacion.paginaActual]);
+
+  // Cargar datos (sin bloquear los filtros)
+  useEffect(() => {
+    cargarEntregas();
+  }, [cargarEntregas, refreshTrigger]);
+
+  // Cargar áreas solo una vez (o cuando realmente se requiera)
+  useEffect(() => {
+    cargarAreas();
+  }, []);
+
+  // Asegurar que `areas` siempre sea un array (protección adicional)
+  useEffect(() => {
+    if (!Array.isArray(areas)) {
+      const normalized = Array.isArray(areas?.data) ? areas.data : [];
+      setAreas(normalized);
+    }
+  }, [areas]);
+
 
   const cargarAreas = async () => {
     try {
@@ -321,6 +327,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
         search: filtros.busqueda,
         estado: filtros.estado,
         area: filtros.area,
+        kit: filtros.kit,
         export: 'excel'
       });
 
@@ -390,7 +397,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
           </div>
 
           {/* Filtros rediseñados */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-5 gap-3">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <i className='bx bx-search text-xl text-gray-400'></i>
@@ -437,6 +444,22 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
                     {area.nombre_area}
                   </option>
                 )) : null}
+              </select>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <i className='bx bx-archive text-xl text-gray-400'></i>
+              </div>
+              <select
+                value={filtros.kit}
+                onChange={(e) => handleFiltroChange('kit', e.target.value)}
+                className="w-full pl-11 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#B39237]/20 focus:border-[#B39237] focus:bg-white focus:outline-none text-gray-900 appearance-none cursor-pointer transition-all duration-150"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
+              >
+                <option value="">Todos los kits</option>
+                <option value="con">Con kit</option>
+                <option value="sin">Sin kit</option>
               </select>
             </div>
 

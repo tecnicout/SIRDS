@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import ResourceHeader from '../components/UI/ResourceHeader';
 import CardPanel from '../components/UI/CardPanel';
+import CountdownWheels from '../components/CountdownWheels';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
+  const [nextDelivery, setNextDelivery] = useState({ loading: true, data: null, error: null });
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -19,6 +21,38 @@ export default function Dashboard() {
     }
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchDelivery = async () => {
+      try {
+        const response = await fetch('/api/public/proxima-entrega', {
+          signal: controller.signal
+        });
+        const json = await response.json();
+        if (json.success && json.data) {
+          setNextDelivery({ loading: false, data: json.data, error: null });
+        } else {
+          setNextDelivery({ loading: false, data: null, error: json.message || 'Aún no hay fecha de entrega programada' });
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        setNextDelivery({ loading: false, data: null, error: 'No se pudo obtener la próxima entrega' });
+      }
+    };
+    fetchDelivery();
+    return () => controller.abort();
+  }, []);
+
+  const formatDeliveryDate = () => {
+    if (!nextDelivery.data?.fecha_entrega_iso) return '';
+    return new Date(nextDelivery.data.fecha_entrega_iso).toLocaleString('es-CO', {
+      dateStyle: 'full',
+      timeStyle: 'short'
+    });
+  };
+
+  const targetDate = nextDelivery.data?.fecha_entrega_iso;
+
   return (
     <div className="space-y-6">
       <ResourceHeader
@@ -31,6 +65,25 @@ export default function Dashboard() {
           { icon: 'bx-zap', label: 'Entregas', value: 89 },
         ]}
       />
+
+      <CardPanel title="Próxima entrega de dotación" icon="bx-time">
+        {nextDelivery.loading ? (
+          <p className="text-gray-500">Consultando ciclo activo...</p>
+        ) : nextDelivery.data ? (
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-500 uppercase tracking-[0.3em]">Fecha programada</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{formatDeliveryDate()}</p>
+              <p className="text-sm text-gray-500 mt-1">Ciclo: {nextDelivery.data.nombre_ciclo}</p>
+            </div>
+            <div className="w-full md:max-w-xl">
+              <CountdownWheels targetDate={targetDate} />
+            </div>
+          </div>
+        ) : (
+          <div className="text-gray-500">{nextDelivery.error || 'Aún no hay fecha de entrega programada'}</div>
+        )}
+      </CardPanel>
 
       <CardPanel title="Información de Sesión" icon="bx-id-card">
         {user ? (

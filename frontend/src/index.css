@@ -104,6 +104,16 @@ body.no-containers .always-white {
   background-color: #ffffff !important;
 }
 
+@keyframes pulseCountdown {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.countdown-card {
+  animation: pulseCountdown 2s ease-in-out infinite;
+}
+
 /* Boxicons icons styling - Simple and direct approach */
 .bx, .bxl {
   font-family: 'boxicons' !important;

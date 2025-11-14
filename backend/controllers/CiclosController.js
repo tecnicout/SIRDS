@@ -3,6 +3,16 @@ const EmpleadoCicloModel = require('../models/EmpleadoCicloModel');
 const SalarioMinimoModel = require('../models/SalarioMinimoModel');
 const { query } = require('../config/database');
 
+const recalcularTotalEmpleados = async (id_ciclo) => {
+  const rows = await query(
+    'SELECT COUNT(*) as total FROM empleado_ciclo WHERE id_ciclo = ?',
+    [id_ciclo]
+  );
+  const total = Array.isArray(rows) && rows[0] ? Number(rows[0].total) : 0;
+  await CicloDotacionModel.updateTotalEmpleados(id_ciclo, total);
+  return total;
+};
+
 class CiclosController {
   /**
    * Listar todos los ciclos con paginación
@@ -85,10 +95,10 @@ class CiclosController {
         });
       }
 
-      // Calcular ventana de ejecución (1 mes antes)
+  // Calcular ventana de ejecución (2 meses antes)
       const fechaEntrega = new Date(fecha_entrega);
       const fechaInicioVentana = new Date(fechaEntrega);
-      fechaInicioVentana.setMonth(fechaInicioVentana.getMonth() - 1);
+  fechaInicioVentana.setMonth(fechaInicioVentana.getMonth() - 2);
 
       // Validar que estemos dentro de la ventana
       const validacion = await CicloDotacionModel.validarVentana(fecha_entrega);
@@ -231,6 +241,136 @@ class CiclosController {
         success: false,
         message: error.message
       });
+    }
+  }
+
+  /**
+   * Buscar candidatos disponibles para agregar manualmente a un ciclo
+   */
+  static async buscarCandidatosCiclo(req, res) {
+    try {
+      const { id } = req.params;
+      const { q = '', limit = 10 } = req.query;
+
+      const ciclo = await CicloDotacionModel.getById(id);
+      if (!ciclo) {
+        return res.status(404).json({ success: false, message: 'Ciclo no encontrado' });
+      }
+
+      let smlvValor = Number.parseFloat(ciclo.valor_smlv_aplicado);
+      if (!Number.isFinite(smlvValor) && ciclo.fecha_entrega) {
+        const year = new Date(ciclo.fecha_entrega).getFullYear();
+        const smlv = await SalarioMinimoModel.getByYear(year);
+        if (smlv) {
+          smlvValor = Number.parseFloat(smlv.valor_mensual);
+        }
+      }
+
+      const candidatos = await EmpleadoCicloModel.buscarCandidatosDisponibles(
+        Number(id),
+        q,
+        limit,
+        Number.isFinite(smlvValor) ? smlvValor : null
+      );
+
+      res.json({
+        success: true,
+        data: candidatos,
+        meta: {
+          ciclo: { id_ciclo: Number(id), estado: ciclo.estado },
+          total: candidatos.length
+        }
+      });
+    } catch (error) {
+      console.error('Error al buscar candidatos del ciclo:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
+   * Agregar un empleado manualmente al ciclo activo
+   */
+  static async agregarEmpleadoManual(req, res) {
+    try {
+      const { id } = req.params;
+      const { id_empleado, motivo_manual, id_kit } = req.body || {};
+
+      if (!id_empleado) {
+        return res.status(400).json({ success: false, message: 'El id_empleado es requerido' });
+      }
+
+      if (!motivo_manual || !motivo_manual.trim()) {
+        return res.status(400).json({ success: false, message: 'Debes especificar el motivo manual' });
+      }
+
+      const ciclo = await CicloDotacionModel.getById(id);
+      if (!ciclo) {
+        return res.status(404).json({ success: false, message: 'Ciclo no encontrado' });
+      }
+
+      if (ciclo.estado === 'cerrado') {
+        return res.status(400).json({ success: false, message: 'No se pueden agregar empleados a un ciclo cerrado' });
+      }
+
+      const contextoUsuario = req.usuario || req.user;
+      if (!contextoUsuario || !contextoUsuario.id_usuario) {
+        return res.status(401).json({ success: false, message: 'No autenticado' });
+      }
+
+      const result = await EmpleadoCicloModel.insertManual({
+        id_ciclo: Number(id),
+        id_empleado,
+        motivo_manual: motivo_manual.trim().slice(0, 255),
+        id_usuario: contextoUsuario.id_usuario,
+        id_kit: id_kit || null
+      });
+
+      const total = await recalcularTotalEmpleados(Number(id));
+
+      res.status(201).json({
+        success: true,
+        message: 'Empleado agregado manualmente al ciclo',
+        data: {
+          id_empleado_ciclo: result.id_empleado_ciclo,
+          id_ciclo: Number(id),
+          total_empleados: total
+        }
+      });
+    } catch (error) {
+      console.error('Error al agregar empleado manual:', error);
+      const mensaje = error.message || 'Error al agregar empleado manual';
+      const status = /asociado a este ciclo|inactivo|no encontrado/i.test(mensaje) ? 400 : 500;
+      res.status(status).json({ success: false, message: mensaje });
+    }
+  }
+
+  /**
+   * Eliminar (excluir) un empleado del ciclo mientras siga en estado procesado
+   */
+  static async eliminarEmpleadoManual(req, res) {
+    try {
+      const { id_empleado_ciclo } = req.params;
+      if (!id_empleado_ciclo) {
+        return res.status(400).json({ success: false, message: 'ID del empleado_ciclo requerido' });
+      }
+
+      const result = await EmpleadoCicloModel.delete(id_empleado_ciclo);
+      const total = await recalcularTotalEmpleados(result.id_ciclo);
+
+      res.json({
+        success: true,
+        message: 'Empleado eliminado del ciclo',
+        data: {
+          id_empleado_ciclo: Number(id_empleado_ciclo),
+          id_ciclo: result.id_ciclo,
+          total_empleados: total
+        }
+      });
+    } catch (error) {
+      console.error('Error al eliminar empleado del ciclo:', error);
+      const mensaje = error.message || 'Error al eliminar empleado';
+      const status = /Solo se pueden eliminar empleados en estado "procesado"|Empleado no encontrado/i.test(mensaje) ? 400 : 500;
+      res.status(status).json({ success: false, message: mensaje });
     }
   }
 
@@ -406,6 +546,55 @@ class CiclosController {
       res.status(500).json({
         success: false,
         message: error.message
+      });
+    }
+  }
+
+  /**
+   * Endpoint público: obtener la próxima fecha de entrega del ciclo activo
+   */
+  static async obtenerProximaEntregaPublica(req, res) {
+    try {
+      const ciclo = await CicloDotacionModel.getCicloActivo();
+
+      if (!ciclo) {
+        return res.json({
+          success: true,
+          data: null,
+          message: 'Aún no hay fecha de entrega programada'
+        });
+      }
+
+      const fechaEntregaRaw = ciclo.fecha_entrega;
+      const fechaEntrega = fechaEntregaRaw instanceof Date
+        ? fechaEntregaRaw
+        : new Date(fechaEntregaRaw);
+
+      if (!fechaEntrega || Number.isNaN(fechaEntrega.getTime()) || fechaEntrega < new Date()) {
+        return res.json({
+          success: true,
+          data: null,
+          message: 'Aún no hay fecha de entrega programada'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          id_ciclo: ciclo.id_ciclo,
+          nombre_ciclo: ciclo.nombre_ciclo,
+          fecha_entrega: ciclo.fecha_entrega,
+          fecha_entrega_iso: fechaEntrega.toISOString(),
+          total_empleados: ciclo.total_empleados,
+          procesados: ciclo.procesados,
+          entregados: ciclo.entregados
+        }
+      });
+    } catch (error) {
+      console.error('[obtenerProximaEntregaPublica] Error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'No se pudo consultar la próxima entrega'
       });
     }
   }

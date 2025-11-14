@@ -156,13 +156,14 @@ CREATE TABLE DetalleSolicitudDotacion (
     FOREIGN KEY (id_talla) REFERENCES Talla(id_talla)
 );
 
--- Tabla: PedidoCompras
 CREATE TABLE PedidoCompras (
     id_pedido INT AUTO_INCREMENT PRIMARY KEY,
+    id_ciclo INT NULL,
     fecha DATE NOT NULL,
     estado ENUM('enviado', 'recibido_parcial', 'recibido_completo') NOT NULL DEFAULT 'enviado',
     observaciones TEXT,
-    total_pedido DECIMAL(12,2) DEFAULT 0.00
+    total_pedido DECIMAL(12,2) DEFAULT 0.00,
+    FOREIGN KEY (id_ciclo) REFERENCES ciclo_dotacion(id_ciclo)
 );
 
 -- Tabla: DetallePedidoCompras
@@ -367,10 +368,10 @@ INSERT INTO EntregaDotacion (id_empleado, id_dotacion, id_talla, cantidad, fecha
 (5, 2, 8, 2, '2024-10-05', 'Kit supervisor - entrega completa');
 
 -- Pedidos de compra
-INSERT INTO PedidoCompras (fecha, estado, observaciones, total_pedido) VALUES 
-('2024-09-15', 'recibido_completo', 'Pedido mensual uniformes', 15750000.00),
-('2024-10-01', 'enviado', 'Reposición stock EPP', 8500000.00),
-('2024-10-07', 'enviado', 'Pedido urgente calzado seguridad', 12000000.00);
+INSERT INTO PedidoCompras (id_ciclo, fecha, estado, observaciones, total_pedido) VALUES 
+(33, '2024-09-15', 'recibido_completo', 'Pedido mensual uniformes', 15750000.00),
+(33, '2024-10-01', 'enviado', 'Reposición stock EPP', 8500000.00),
+(33, '2024-10-07', 'enviado', 'Pedido urgente calzado seguridad', 12000000.00);
 
 -- Historial de movimientos
 INSERT INTO HistorialMovimientos (tabla_modificada, id_registro, tipo_movimiento, usuario_responsable, detalle_cambio) VALUES 

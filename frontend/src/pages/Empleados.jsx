@@ -102,19 +102,12 @@ const EMPLEADOS_COLUMNS = [
     )
   },
   {
-    key: 'fechas_info',
-    label: 'Fechas',
+    key: 'kit_info',
+    label: 'Kit',
     width: '14%',
     render: (value, row) => (
-      <div>
-        <div className="text-sm text-gray-900">
-          Inicio: {row.fecha_inicio ? new Date(row.fecha_inicio).toLocaleDateString() : 'N/A'}
-        </div>
-        {row.fecha_fin && (
-          <div className="text-sm text-red-500">
-            Fin: {new Date(row.fecha_fin).toLocaleDateString()}
-          </div>
-        )}
+      <div className="text-sm text-gray-900">
+        {row.kit_nombre || 'Sin kit asignado'}
       </div>
     )
   }
@@ -138,6 +131,7 @@ const EMPLEADO_VIEW_FIELDS = [
   { key: 'genero_nombre', label: 'Género' },
   { key: 'nombre_area', label: 'Área' },
   { key: 'ubicacion_nombre', label: 'Ubicación' },
+  { key: 'kit_nombre', label: 'Kit' },
   { 
     key: 'fecha_inicio', 
     label: 'Fecha de Inicio', 
@@ -169,6 +163,7 @@ export default function Empleados() {
   const [areas, setAreas] = useState([]);
   const [generos, setGeneros] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
+  const [kits, setKits] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -234,6 +229,7 @@ export default function Empleados() {
     try {
       const token = localStorage.getItem('token');
       
+      // Traer solo áreas activas
       const response = await fetch('/api/areas', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -304,13 +300,36 @@ export default function Empleados() {
     }
   }, []);
 
+  // Cargar kits disponibles (activos)
+  const cargarKits = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/kits', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setKits(result.data || []);
+      } else {
+        console.error('Error al cargar kits:', response.status);
+        // No mostrar toast de error para no molestar si no es crítico
+      }
+    } catch (error) {
+      console.error('Error al cargar kits:', error);
+    }
+  }, []);
+
   // Cargar datos al iniciar el componente
   useEffect(() => {
     cargarEmpleados();
     cargarAreas();
     cargarGeneros();
     cargarUbicaciones();
-  }, [cargarEmpleados, cargarAreas, cargarGeneros, cargarUbicaciones]);
+    cargarKits();
+  }, [cargarEmpleados, cargarAreas, cargarGeneros, cargarUbicaciones, cargarKits]);
 
   // Función de búsqueda avanzada con useCallback
   const buscarEmpleados = useCallback(async (termino) => {
@@ -550,7 +569,9 @@ export default function Empleados() {
       fecha_inicio: formatDateForInput(empleado.fecha_inicio),
       fecha_fin: formatDateForInput(empleado.fecha_fin),
       // Convertir estado boolean a número para el select
-      estado: empleado.estado ? 1 : 0
+      estado: empleado.estado ? 1 : 0,
+      // id_kit opcional: si viene null/undefined, dejar vacío para el select
+      id_kit: empleado.id_kit ?? ''
     };
 
     setEditingEmpleado(empleadoParaEditar);
@@ -626,9 +647,21 @@ export default function Empleados() {
           }))
         };
       }
+      if (field.name === 'id_kit') {
+        return {
+          ...field,
+          placeholder: 'Selecciona un kit del área',
+          // Pasar todas las opciones con id_area para filtrar dinámicamente en el modal
+          optionsAll: kits.map(k => ({
+            value: k.id_kit,
+            label: `${k.nombre}${k.nombre_area ? ' (' + k.nombre_area + ')' : ''}`,
+            id_area: k.id_area
+          }))
+        };
+      }
       return field;
     });
-  }, [areas, generos, ubicaciones]);
+  }, [areas, generos, ubicaciones, kits]);
 
   if (isLoading) {
     return (
@@ -909,7 +942,8 @@ export default function Empleados() {
             estado: 1,
             id_genero: '',
             id_area: '',
-            id_ubicacion: ''
+            id_ubicacion: '',
+            id_kit: ''
           }}
         />
       )}

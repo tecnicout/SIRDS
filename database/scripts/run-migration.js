@@ -34,7 +34,7 @@ async function main() {
     port: DB_PORT,
     user: DB_USER,
     password: DB_PASSWORD,
-    // No forzamos database aquí para permitir el USE dinámico
+    database: DB_NAME,
     multipleStatements: false
   });
 

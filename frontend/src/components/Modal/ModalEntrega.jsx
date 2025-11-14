@@ -79,15 +79,13 @@ const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
         setFormData(prev => ({ ...prev, id_dotacion: '', id_talla: '', observaciones: '' }));
         setRequiereTalla(false);
 
-        // Preferir la lista de dotaciones que devuelve el endpoint de empleado
-        // (DotacionesController.getKitDotacionPorEmpleado) si está disponible.
-        // Establecemos esto inmediatamente para evitar que llamadas posteriores
-        // (por ejemplo a /api/kits/area con id_area vacío) sobreescriban con
-        // resultados globales o el catálogo completo.
-        if (data.dotaciones_disponibles && Array.isArray(data.dotaciones_disponibles) && data.dotaciones_disponibles.length > 0) {
-          setKitData({ kit: data.kit || null, dotaciones: data.dotaciones_disponibles });
-        } else {
-          setKitData(data.kit ? { kit: data.kit, dotaciones: [] } : null);
+        const dotacionesPreferidas = Array.isArray(data.dotaciones_disponibles) ? data.dotaciones_disponibles : [];
+        const kitPayload = (data.kit || dotacionesPreferidas.length > 0)
+          ? { kit: data.kit || null, dotaciones: dotacionesPreferidas }
+          : null;
+        setKitData(kitPayload);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[ModalEntrega] dotaciones asignadas al empleado:', dotacionesPreferidas.map(d => d.id_dotacion));
         }
 
         // Si el endpoint de empleado ya nos devolvió metadata del kit, usarla
@@ -96,67 +94,9 @@ const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
           setFormData(prev => ({ ...prev, id_kit: data.kit.id_kit }));
         }
 
-        // Además intentamos obtener metadatos del kit por área (nombre, id_kit)
-        // y preferimos la lista de dotaciones devuelta por ese endpoint si existe.
-        // Solo solicitamos /api/kits/area si tenemos un id_area válido. Si no lo
-        // tenemos, nos quedamos con la lista calculada por el endpoint empleado.
-        const idArea = data.empleado && (data.empleado.id_area || data.empleado.idArea || data.empleado.area);
-        if (idArea) {
-          try {
-            const kitRes = await fetch('http://localhost:3001/api/kits/area/' + encodeURIComponent(idArea), {
-              headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') },
-              cache: 'no-store'
-            });
-            const kitJson = await kitRes.json();
-            if (kitJson && kitJson.success && kitJson.data) {
-              // Solo sobreescribimos las dotaciones si la respuesta por área trae
-              // una lista válida (no vacía). De lo contrario, mantenemos la lista
-              // provista por el endpoint de empleado (que ya filtró por área).
-              const dotacionesArea = Array.isArray(kitJson.data.dotaciones) ? kitJson.data.dotaciones : [];
-              if (dotacionesArea.length > 0) {
-                const kitObj = kitJson.data.kit || null;
-                // seguridad extra: confirmar que el kit corresponde al mismo área
-                if (!kitObj || String(kitObj.id_area || kitObj.area) === String(idArea) || true) {
-                  setKitData({ kit: kitObj, dotaciones: dotacionesArea });
-                  if (process.env.NODE_ENV !== 'production') {
-                    console.log('[ModalEntrega] kitData set from /api/kits/area, dotaciones count:', dotacionesArea.length, 'ids:', dotacionesArea.map(d => d.id_dotacion));
-                  }
-
-                  if (kitObj && kitObj.id_kit) {
-                    setFormData(prev => ({ ...prev, id_kit: kitObj.id_kit }));
-                  }
-
-                  const firstDot = dotacionesArea[0];
-                  setRequiereTalla(Boolean(firstDot && (firstDot.talla_requerida === 1 || firstDot.talla_requerida === '1')));
-                  try {
-                    const tallasRes = await fetch('http://localhost:3001/api/dotaciones/tallas/' + firstDot.id_dotacion + '/' + data.empleado.id_empleado, {
-                      headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') }
-                    });
-                    const tallasJson = await tallasRes.json();
-                    if (tallasJson && tallasJson.success) {
-                      setTallas(tallasJson.data || []);
-                      if (tallasJson.data && tallasJson.data.length > 0) {
-                        setFormData(prev => ({ ...prev, id_talla: tallasJson.data[0].id_talla }));
-                      }
-                    }
-                  } catch (tErr) {
-                    console.error('Error tallas:', tErr);
-                  }
-                }
-              } else {
-                if (process.env.NODE_ENV !== 'production') {
-                  console.log('[ModalEntrega] /api/kits/area returned no dotaciones for area', idArea, '-- keeping empleado-provided list');
-                }
-              }
-            }
-          } catch (kErr) {
-            console.error('Error fetching kit:', kErr);
-          }
-        } else {
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('[ModalEntrega] empleado tiene id_area vacío o indefinido; se mantiene la lista proporcionada por /api/dotaciones/empleado');
-          }
-        }
+        // Determinar si el primer elemento requiere talla para habilitar UI.
+        const firstDot = dotacionesPreferidas[0];
+        setRequiereTalla(Boolean(firstDot && (firstDot.talla_requerida === 1 || firstDot.talla_requerida === '1')));
 
         // Reiniciar selecciones de tallas por ítem cuando se carga un empleado nuevo
         setTallasPorItemOptions({});

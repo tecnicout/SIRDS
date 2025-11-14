@@ -402,8 +402,8 @@ class CicloDotacionModel {
    */
   static async validarVentana(fecha_entrega) {
     try {
-      const fecha_inicio_ventana = new Date(fecha_entrega);
-      fecha_inicio_ventana.setMonth(fecha_inicio_ventana.getMonth() - 1);
+  const fecha_inicio_ventana = new Date(fecha_entrega);
+  fecha_inicio_ventana.setMonth(fecha_inicio_ventana.getMonth() - 2);
 
       const hoy = new Date();
       const fechaEntrega = new Date(fecha_entrega);

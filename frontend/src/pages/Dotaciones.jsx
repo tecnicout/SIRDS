@@ -597,7 +597,6 @@ const Dotaciones = () => {
                 className="w-full px-4 py-2 border-2 rounded-xl focus:ring-2 focus:ring-[#B39237]/30 focus:border-[#B39237]"
                 disabled={editSubmitting}
               >
-                <option value="pendiente">Pendiente</option>
                 <option value="activo">Activo</option>
                 <option value="cerrado">Cerrado</option>
               </select>

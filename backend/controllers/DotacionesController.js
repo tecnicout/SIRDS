@@ -61,16 +61,16 @@ class DotacionesController {
                 empleadoId = empRows[0].id_empleado;
             }
 
-            // Validar kit para área (opcional: sólo permitir guardar para dotaciones del kit)
-            const areaRows = await query('SELECT id_area FROM empleado WHERE id_empleado = ? LIMIT 1', [empleadoId]);
-            const id_area = areaRows.length ? areaRows[0].id_area : null;
+            // Validar kit asignado directamente al empleado
+            const empleadoRows = await query('SELECT id_kit FROM empleado WHERE id_empleado = ? LIMIT 1', [empleadoId]);
+            if (!empleadoRows.length || !empleadoRows[0].id_kit) {
+                return res.status(400).json({ success: false, code: 'EMPLOYEE_WITHOUT_KIT', message: 'El empleado aún no tiene un kit asignado. No es posible guardar tallas.' });
+            }
+
             let kitDotacionesIds = [];
-            if (id_area) {
-                const kitRow = await query('SELECT id_kit FROM kitdotacion WHERE id_area = ? AND activo = 1 LIMIT 1', [id_area]);
-                if (kitRow.length) {
-                    const comp = await query('SELECT id_dotacion FROM detallekitdotacion WHERE id_kit = ?', [kitRow[0].id_kit]);
-                    kitDotacionesIds = comp.map(r => r.id_dotacion);
-                }
+            const comp = await query('SELECT id_dotacion FROM detallekitdotacion WHERE id_kit = ?', [empleadoRows[0].id_kit]);
+            if (comp.length) {
+                kitDotacionesIds = comp.map(r => r.id_dotacion);
             }
 
                         // Asegurar tabla de preferencias de tallas
@@ -222,7 +222,8 @@ class DotacionesController {
                 limit = 10, 
                 search = '', 
                 area = '', 
-                estado = ''
+                estado = '',
+                kit = '' // '', 'con', 'sin'
             } = req.query || {};
 
             const pageNum = Math.max(parseInt(page, 10) || 1, 1);
@@ -280,8 +281,8 @@ class DotacionesController {
                     e.cargo AS cargo,
                     a.nombre_area AS nombre_area,
                     u.nombre AS nombre_ubicacion,
-                    k2.id_kit AS id_kit,
-                    k2.nombre AS nombre_kit,
+                    ec.id_kit AS id_kit,
+                    COALESCE(k2.nombre, 'Sin kit asignado') AS nombre_kit,
                     COALESCE(ec.fecha_entrega_real, ec.fecha_asignacion) AS fecha_entrega,
                     ec.observaciones,
                     CASE 
@@ -293,7 +294,7 @@ class DotacionesController {
                 INNER JOIN empleado e ON ec.id_empleado = e.id_empleado
                 INNER JOIN area a ON e.id_area = a.id_area
                 INNER JOIN ubicacion u ON e.id_ubicacion = u.id_ubicacion
-                LEFT JOIN kitdotacion k2 ON k2.id_area = e.id_area AND k2.activo = 1
+                LEFT JOIN kitdotacion k2 ON k2.id_kit = ec.id_kit
                 INNER JOIN ciclo_dotacion cd ON ec.id_ciclo = cd.id_ciclo
                 WHERE ec.id_ciclo = ?
                   AND cd.estado = 'activo'
@@ -321,6 +322,16 @@ class DotacionesController {
                 }
             }
 
+            // Filtro por kit asignado
+            if (kit !== undefined && kit !== null && String(kit).trim() !== '') {
+                const kval = String(kit).trim().toLowerCase();
+                if (['con','1','si','sí','true'].includes(kval)) {
+                    selectSql += ' AND ec.id_kit IS NOT NULL';
+                } else if (['sin','0','no','false'].includes(kval)) {
+                    selectSql += ' AND ec.id_kit IS NULL';
+                }
+            }
+
             selectSql += ` ORDER BY a.nombre_area, e.apellido, e.nombre LIMIT ${limitNum} OFFSET ${offset}`;
 
             const rows = await query(selectSql, selectParams);
@@ -345,6 +356,14 @@ class DotacionesController {
                     countSql += ' AND ec.estado = "procesado"';
                 } else if (est === 'en proceso') {
                     countSql += ' AND ec.estado = "en_proceso"';
+                }
+            }
+            if (kit !== undefined && kit !== null && String(kit).trim() !== '') {
+                const kval = String(kit).trim().toLowerCase();
+                if (['con','1','si','sí','true'].includes(kval)) {
+                    countSql += ' AND ec.id_kit IS NOT NULL';
+                } else if (['sin','0','no','false'].includes(kval)) {
+                    countSql += ' AND ec.id_kit IS NULL';
                 }
             }
             const [{ total }] = await query(countSql, countParams);
@@ -1004,6 +1023,14 @@ class DotacionesController {
             // kitResult -> { kit: {...} , dotaciones: [...] }
             const dotaciones = kitResult && kitResult.dotaciones ? kitResult.dotaciones : [];
             const kitInfo = kitResult && kitResult.kit ? kitResult.kit : null;
+
+            if (!kitInfo) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'EMPLOYEE_WITHOUT_KIT',
+                    message: 'El empleado aún no tiene un kit asignado. Solicita al administrador que registre el kit correspondiente.'
+                });
+            }
             
             // DEBUG: en desarrollo, loggear las dotaciones que vamos a devolver para este empleado
             if (process.env.NODE_ENV !== 'production') {

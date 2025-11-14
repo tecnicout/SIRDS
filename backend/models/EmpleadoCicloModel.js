@@ -20,6 +20,8 @@ class EmpleadoCicloModel {
           ec.sueldo_al_momento,
           ec.id_area,
           ec.observaciones,
+          ec.inclusion_manual,
+          ec.motivo_manual,
           ec.fecha_asignacion,
           ec.fecha_entrega_real,
           ec.fecha_actualizacion,
@@ -29,7 +31,7 @@ class EmpleadoCicloModel {
           e.email,
           e.cargo,
           a.nombre_area,
-          k.nombre AS nombre_kit,
+          COALESCE(k.nombre, 'Sin kit asignado') AS nombre_kit,
           CONCAT(e.nombre, ' ', e.apellido) as nombre_completo
         FROM empleado_ciclo ec
         INNER JOIN empleado e ON ec.id_empleado = e.id_empleado
@@ -78,6 +80,130 @@ class EmpleadoCicloModel {
       };
     } catch (error) {
       throw new Error(`Error al obtener empleados del ciclo: ${error.message}`);
+    }
+  }
+
+  static async buscarCandidatosDisponibles(id_ciclo, search = '', limit = 10, smlvValor = null) {
+    try {
+      const cleanLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
+      const normalizedSearch = (search || '').trim();
+
+      let sql = `
+        SELECT 
+          e.id_empleado,
+          e.Identificacion AS documento,
+          e.nombre,
+          e.apellido,
+          CONCAT(e.nombre, ' ', e.apellido) as nombre_completo,
+          e.email,
+          e.cargo,
+          e.id_area,
+          a.nombre_area,
+          e.sueldo,
+          e.id_kit,
+          TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses,
+          CASE WHEN TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) >= 3 THEN 1 ELSE 0 END as cumple_antiguedad,
+          CASE WHEN ? IS NULL THEN NULL WHEN e.sueldo <= (? * 2) THEN 1 ELSE 0 END as cumple_sueldo
+        FROM empleado e
+        INNER JOIN area a ON e.id_area = a.id_area
+        WHERE e.estado = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM empleado_ciclo ec
+            WHERE ec.id_ciclo = ? AND ec.id_empleado = e.id_empleado
+          )
+      `;
+
+      const params = [smlvValor, smlvValor, id_ciclo];
+
+      if (normalizedSearch) {
+        const likeTerm = `%${normalizedSearch}%`;
+        sql += ` AND (
+          e.Identificacion LIKE ?
+          OR e.nombre LIKE ?
+          OR e.apellido LIKE ?
+          OR CONCAT(e.nombre, ' ', e.apellido) LIKE ?
+        )`;
+        params.push(likeTerm, likeTerm, likeTerm, likeTerm);
+      }
+
+      sql += ` ORDER BY e.apellido, e.nombre LIMIT ${cleanLimit}`;
+
+      return await query(sql, params);
+    } catch (error) {
+      throw new Error(`Error al buscar candidatos disponibles: ${error.message}`);
+    }
+  }
+
+  static async insertManual({ id_ciclo, id_empleado, motivo_manual, id_usuario, id_kit = null }) {
+    const connection = await getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [empleadoRows] = await connection.query(
+        `SELECT 
+            e.id_empleado,
+            e.estado,
+            e.fecha_inicio,
+            e.sueldo,
+            e.id_area,
+            e.id_kit,
+            TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses
+         FROM empleado e
+         WHERE e.id_empleado = ?
+         LIMIT 1`,
+        [id_empleado]
+      );
+
+      const empleado = empleadoRows && empleadoRows[0] ? empleadoRows[0] : null;
+      if (!empleado || Number(empleado.estado) !== 1) {
+        throw new Error('Empleado no encontrado o inactivo');
+      }
+
+      const [existentes] = await connection.query(
+        'SELECT id_empleado_ciclo FROM empleado_ciclo WHERE id_ciclo = ? AND id_empleado = ? LIMIT 1',
+        [id_ciclo, id_empleado]
+      );
+
+      if (Array.isArray(existentes) && existentes.length > 0) {
+        throw new Error('El empleado ya está asociado a este ciclo');
+      }
+
+      const kitAsignado = id_kit ?? empleado.id_kit ?? null;
+
+      const [result] = await connection.query(
+        `INSERT INTO empleado_ciclo (
+          id_ciclo,
+          id_empleado,
+          id_kit,
+          estado,
+          antiguedad_meses,
+          sueldo_al_momento,
+          id_area,
+          observaciones,
+          inclusion_manual,
+          motivo_manual,
+          fecha_asignacion,
+          actualizado_por
+        ) VALUES (?, ?, ?, 'procesado', ?, ?, ?, NULL, 1, ?, NOW(), ?)`,
+        [
+          id_ciclo,
+          id_empleado,
+          kitAsignado,
+          empleado.antiguedad_meses,
+          empleado.sueldo,
+          empleado.id_area,
+          motivo_manual,
+          id_usuario
+        ]
+      );
+
+      await connection.commit();
+      return { id_empleado_ciclo: result.insertId, id_ciclo };
+    } catch (error) {
+      await connection.rollback();
+      throw new Error(`Error al agregar empleado manual: ${error.message}`);
+    } finally {
+      connection.release();
     }
   }
 
@@ -375,26 +501,25 @@ class EmpleadoCicloModel {
     const connection = await getConnection();
     try {
       await connection.beginTransaction();
-      const [result] = await connection.execute(
-        `INSERT INTO empleado_ciclo (
-            id_ciclo, id_empleado, id_kit, estado, antiguedad_meses, sueldo_al_momento, id_area
-         )
-         SELECT ?, e.id_empleado, k.id_kit, 'procesado',
-                TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses,
-                e.sueldo, e.id_area
-         FROM empleado e
-         INNER JOIN area a ON e.id_area = a.id_area
-         LEFT JOIN kitdotacion k ON k.id_area = a.id_area AND k.activo = 1
-         WHERE e.estado = 1
-           AND e.sueldo > 0
-           AND TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) >= 3
-           AND e.sueldo <= (? * 2)
-           AND NOT EXISTS (
-              SELECT 1 FROM empleado_ciclo ec
-              WHERE ec.id_ciclo = ? AND ec.id_empleado = e.id_empleado
-           )`,
-        [id_ciclo, smlv_valor, id_ciclo]
-      );
+    const [result] = await connection.execute(
+      `INSERT INTO empleado_ciclo (
+        id_ciclo, id_empleado, id_kit, estado, antiguedad_meses, sueldo_al_momento, id_area
+      )
+      SELECT ?, e.id_empleado, e.id_kit, 'procesado',
+           TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) as antiguedad_meses,
+           e.sueldo, e.id_area
+      FROM empleado e
+      INNER JOIN area a ON e.id_area = a.id_area
+      WHERE e.estado = 1
+        AND e.sueldo > 0
+        AND TIMESTAMPDIFF(MONTH, e.fecha_inicio, CURDATE()) >= 3
+        AND e.sueldo <= (? * 2)
+        AND NOT EXISTS (
+          SELECT 1 FROM empleado_ciclo ec
+          WHERE ec.id_ciclo = ? AND ec.id_empleado = e.id_empleado
+        )`,
+      [id_ciclo, smlv_valor, id_ciclo]
+    );
       await connection.commit();
       return { insertados: Number(result.affectedRows || 0), afectados: Number(result.affectedRows || 0) };
     } catch (error) {
@@ -416,9 +541,9 @@ class EmpleadoCicloModel {
       await connection.beginTransaction();
       const [result] = await connection.execute(
         `UPDATE empleado_ciclo ec
-         INNER JOIN kitdotacion k ON k.id_area = ec.id_area AND k.activo = 1
-         SET ec.id_kit = k.id_kit
-         WHERE ec.id_ciclo = ? AND ec.id_kit IS NULL`,
+         INNER JOIN empleado e ON e.id_empleado = ec.id_empleado
+         SET ec.id_kit = e.id_kit
+         WHERE ec.id_ciclo = ? AND ec.id_kit IS NULL AND e.id_kit IS NOT NULL`,
         [id_ciclo]
       );
       await connection.commit();
@@ -476,7 +601,7 @@ class EmpleadoCicloModel {
     try {
       // Verificar estado
       const empleado = await query(
-        'SELECT estado FROM empleado_ciclo WHERE id_empleado_ciclo = ?',
+        'SELECT id_ciclo, estado FROM empleado_ciclo WHERE id_empleado_ciclo = ?',
         [id_empleado_ciclo]
       );
 
@@ -488,11 +613,11 @@ class EmpleadoCicloModel {
         throw new Error('Solo se pueden eliminar empleados en estado "procesado"');
       }
 
-      const result = await query(
+      await query(
         'DELETE FROM empleado_ciclo WHERE id_empleado_ciclo = ?',
         [id_empleado_ciclo]
       );
-      return result;
+      return { success: true, id_ciclo: empleado[0].id_ciclo };
     } catch (error) {
       throw new Error(`Error al eliminar empleado del ciclo: ${error.message}`);
     }

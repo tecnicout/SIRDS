@@ -2,39 +2,29 @@ const { query } = require('../config/database');
 
 class DotacionModel {
     /**
-     * Obtener el kit de dotación correspondiente al área del empleado
-     * Devuelve un array con los artículos del kit (no prendas sueltas)
+     * Obtener el kit de dotación asociado directamente al empleado.
+     * Si el empleado no tiene id_kit asignado se devuelve respuesta vacía.
      * @param {number} id_empleado
-     * @returns {Promise<Array>} Kit de dotación para el área del empleado
+     * @returns {Promise<{kit: object|null, dotaciones: Array}>}
      */
     static async getKitDotacionPorEmpleado(id_empleado) {
-        // 1. Obtener el área del empleado
-        const areaSql = 'SELECT id_area FROM Empleado WHERE id_empleado = ?';
-        const [empleado] = await query(areaSql, [id_empleado]);
-        if (!empleado || !empleado.id_area) {
-            return [];
+        // 1. Consultar el empleado para conocer su id_kit directo y, si aplica, su área.
+        const empleadoSql = 'SELECT id_area, id_kit FROM Empleado WHERE id_empleado = ?';
+        const [empleado] = await query(empleadoSql, [id_empleado]);
+        if (!empleado) {
+            return { kit: null, dotaciones: [] };
         }
-        // 2. Buscar el kit asignado a esa área.
-        // Para mantener consistencia con /api/kits/area/:id_area preferimos
-        // buscar primero en la tabla `kitdotacion` por `id_area` (kit directo)
-        // y como fallback comprobar `arearolkit`.
-        let kitId = null;
-        const kitDirectSql = 'SELECT id_kit FROM kitdotacion WHERE id_area = ? AND activo = 1 LIMIT 1';
-        const [kitDirect] = await query(kitDirectSql, [empleado.id_area]);
-        if (kitDirect && kitDirect.id_kit) {
-            kitId = kitDirect.id_kit;
-        } else {
-            const kitAreaSql = 'SELECT id_kit FROM arearolkit WHERE id_area = ? LIMIT 1';
-            const [kitArea] = await query(kitAreaSql, [empleado.id_area]);
-            if (kitArea && kitArea.id_kit) {
-                kitId = kitArea.id_kit;
-            } else {
-                return [];
-            }
+
+        const kitId = empleado.id_kit || null;
+
+        if (!kitId) {
+            return { kit: null, dotaciones: [] };
         }
-        // Dev-only debug
+
         if (process.env.NODE_ENV !== 'production') {
-            try { console.log('[DotacionModel] getKitDotacionPorEmpleado -> empleado area', empleado.id_area, 'selected kitId:', kitId); } catch(e){}
+            try {
+                console.log('[DotacionModel] getKitDotacionPorEmpleado -> empleado', id_empleado, 'kit directo:', empleado.id_kit, 'kit usado:', kitId);
+            } catch (e) {}
         }
         // 3. Obtener metadata del kit
         const kitMetaSql = `

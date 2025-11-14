@@ -71,8 +71,10 @@ const entregaRoutes = require('./backend/routes/entregaRoutes');
 const ciclosRoutes = require('./backend/routes/ciclosRoutes');
 const entregasCicloRoutes = require('./backend/routes/entregasRoutes');
 const reportesRoutes = require('./backend/routes/reportesRoutes');
+const publicRoutes = require('./backend/routes/publicRoutes');
 
 // Rutas API
+app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/ubicaciones', ubicacionRoutes);

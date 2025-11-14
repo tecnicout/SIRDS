@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const ReporteDotaciones = () => {
   const [reporteData, setReporteData] = useState({
@@ -13,11 +13,7 @@ const ReporteDotaciones = () => {
   const [loading, setLoading] = useState(true);
   const [tipoReporte, setTipoReporte] = useState('mes');
 
-  useEffect(() => {
-    fetchReportes();
-  }, []);
-
-  const fetchReportes = async () => {
+  const fetchReportes = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -39,7 +35,11 @@ const ReporteDotaciones = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtros.fecha_fin, filtros.fecha_inicio]);
+
+  useEffect(() => {
+    fetchReportes();
+  }, [fetchReportes]);
 
   const handleFiltroChange = (e) => {
     const { name, value } = e.target;

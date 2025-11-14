@@ -54,7 +54,8 @@ class EmpleadoController {
             const {
                 Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
                 email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
-                fecha_fin, estado = 1
+                fecha_fin, estado = 1,
+                id_kit = null
             } = req.body;
 
             // Validaciones básicas
@@ -88,13 +89,24 @@ class EmpleadoController {
             const insertId = await EmpleadoModel.create({
                 Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
                 email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
-                fecha_fin, estado
+                fecha_fin, estado, id_kit
             });
             
+            // Devolver el empleado completo (incluyendo kit_nombre) para compatibilidad con frontend
+            const empleadoCreado = await EmpleadoModel.getById(insertId);
+
             res.status(201).json({
                 success: true,
-                data: { id: insertId },
-                message: 'Empleado creado correctamente'
+                message: 'Empleado creado correctamente',
+                data: { id: insertId, empleado: empleadoCreado },
+                empleado: empleadoCreado ? {
+                    id_empleado: empleadoCreado.id_empleado,
+                    nombre: empleadoCreado.nombre,
+                    apellido: empleadoCreado.apellido,
+                    email: empleadoCreado.email,
+                    id_kit: empleadoCreado.id_kit ?? null,
+                    kit_nombre: empleadoCreado.kit_nombre ?? null
+                } : null
             });
         } catch (error) {
             console.error('Error al crear empleado:', error);
@@ -130,7 +142,8 @@ class EmpleadoController {
             const {
                 Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
                 email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
-                fecha_fin, estado
+                fecha_fin, estado,
+                id_kit = null
             } = req.body;
 
             // Validaciones básicas para campos obligatorios
@@ -174,7 +187,7 @@ class EmpleadoController {
             const updated = await EmpleadoModel.update(id, {
                 Identificacion, tipo_identificacion, nombre, apellido, fecha_nacimiento,
                 email, telefono, cargo, id_genero, id_area, id_ubicacion, fecha_inicio, sueldo, 
-                fecha_fin, estado
+                fecha_fin, estado, id_kit
             });
             
             if (!updated) {
@@ -184,9 +197,12 @@ class EmpleadoController {
                 });
             }
 
+            // Devolver el empleado actualizado para confirmar cambios (incluye kit)
+            const empleadoActualizado = await EmpleadoModel.getById(id);
             res.json({
                 success: true,
-                message: 'Empleado actualizado correctamente'
+                message: 'Empleado actualizado correctamente',
+                data: { empleado: empleadoActualizado }
             });
         } catch (error) {
             console.error('Error al actualizar empleado:', error);
