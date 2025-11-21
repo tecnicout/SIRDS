@@ -8,14 +8,19 @@ class EmpleadoModel {
                 e.*,
                 g.nombre as genero_nombre,
                 a.nombre_area,
-                u.nombre as ubicacion_nombre,
+                ub.nombre as ubicacion_nombre,
                 e.id_kit,
-                k.nombre AS kit_nombre
+                k.nombre AS kit_nombre,
+                u.id_usuario as usuario_id,
+                up.avatar_url,
+                up.avatar_color
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
+            LEFT JOIN Ubicacion ub ON e.id_ubicacion = ub.id_ubicacion
             LEFT JOIN kitdotacion k ON e.id_kit = k.id_kit
+            LEFT JOIN Usuario u ON u.id_empleado = e.id_empleado
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             ORDER BY e.apellido, e.nombre
         `;
         return await query(sql);
@@ -28,15 +33,20 @@ class EmpleadoModel {
                 e.*,
                 g.nombre as genero_nombre,
                 a.nombre_area,
-                u.nombre as ubicacion_nombre,
-                u.id_ubicacion,
+                ub.nombre as ubicacion_nombre,
+                ub.id_ubicacion,
                 e.id_kit,
-                k.nombre AS kit_nombre
+                k.nombre AS kit_nombre,
+                u.id_usuario as usuario_id,
+                up.avatar_url,
+                up.avatar_color
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
+            LEFT JOIN Ubicacion ub ON e.id_ubicacion = ub.id_ubicacion
             LEFT JOIN kitdotacion k ON e.id_kit = k.id_kit
+            LEFT JOIN Usuario u ON u.id_empleado = e.id_empleado
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             WHERE e.id_empleado = ?
         `;
         const result = await query(sql, [id]);
@@ -178,10 +188,15 @@ class EmpleadoModel {
                 e.*,
                 g.nombre as genero_nombre,
                 e.id_kit,
-                k.nombre AS kit_nombre
+                k.nombre AS kit_nombre,
+                u.id_usuario as usuario_id,
+                up.avatar_url,
+                up.avatar_color
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN kitdotacion k ON e.id_kit = k.id_kit
+            LEFT JOIN Usuario u ON u.id_empleado = e.id_empleado
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             WHERE e.id_area = ? AND e.estado = 1
             ORDER BY e.apellido, e.nombre
         `;
@@ -194,10 +209,15 @@ class EmpleadoModel {
             SELECT 
                 e.*,
                 g.nombre as genero_nombre,
-                a.nombre_area
+                a.nombre_area,
+                u.id_usuario as usuario_id,
+                up.avatar_url,
+                up.avatar_color
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
+            LEFT JOIN Usuario u ON u.id_empleado = e.id_empleado
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             WHERE (e.nombre LIKE ? OR e.apellido LIKE ? OR e.email LIKE ?)
                 AND e.estado = 1
             ORDER BY e.apellido, e.nombre
@@ -213,15 +233,20 @@ class EmpleadoModel {
                 e.*,
                 g.nombre as genero_nombre,
                 a.nombre_area,
-                u.nombre as ubicacion_nombre,
-                u.id_ubicacion,
+                ub.nombre as ubicacion_nombre,
+                ub.id_ubicacion,
                 e.id_kit,
-                k.nombre AS kit_nombre
+                k.nombre AS kit_nombre,
+                u.id_usuario as usuario_id,
+                up.avatar_url,
+                up.avatar_color
             FROM Empleado e
             LEFT JOIN Genero g ON e.id_genero = g.id_genero
             LEFT JOIN Area a ON e.id_area = a.id_area
-            LEFT JOIN Ubicacion u ON e.id_ubicacion = u.id_ubicacion
+            LEFT JOIN Ubicacion ub ON e.id_ubicacion = ub.id_ubicacion
             LEFT JOIN kitdotacion k ON e.id_kit = k.id_kit
+            LEFT JOIN Usuario u ON u.id_empleado = e.id_empleado
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             WHERE e.email = ? AND e.estado = 1
         `;
         const result = await query(sql, [email]);

@@ -31,12 +31,15 @@ class UsuarioModel {
                 e.estado as empleado_activo,
                 a.nombre_area,
                 r.nombre_rol,
-                loc.nombre as ubicacion_nombre
+                loc.nombre as ubicacion_nombre,
+                up.avatar_url,
+                up.avatar_color
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
             LEFT JOIN Area a ON e.id_area = a.id_area
             LEFT JOIN Rol r ON u.id_rol = r.id_rol
             LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             WHERE (u.username = ? OR u.email = ?) 
             AND u.activo = 1 
             AND e.estado = 1
@@ -113,6 +116,8 @@ class UsuarioModel {
                 a.nombre_area,
                 r.nombre_rol,
                 loc.nombre as ubicacion_nombre,
+                up.avatar_url,
+                up.avatar_color,
                 creador.username as creado_por_username,
                 actualizador.username as actualizado_por_username
             FROM Usuario u
@@ -120,6 +125,7 @@ class UsuarioModel {
             LEFT JOIN Area a ON e.id_area = a.id_area
             LEFT JOIN Rol r ON u.id_rol = r.id_rol
             LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             LEFT JOIN Usuario creador ON u.creado_por = creador.id_usuario
             LEFT JOIN Usuario actualizador ON u.actualizado_por = actualizador.id_usuario
             ORDER BY u.fecha_creacion DESC
@@ -153,6 +159,8 @@ class UsuarioModel {
                 a.nombre_area,
                 r.nombre_rol,
                 loc.nombre as ubicacion_nombre,
+                up.avatar_url,
+                up.avatar_color,
                 creador.username as creado_por_username,
                 actualizador.username as actualizado_por_username
             FROM Usuario u
@@ -160,6 +168,7 @@ class UsuarioModel {
             LEFT JOIN Area a ON e.id_area = a.id_area
             LEFT JOIN Rol r ON u.id_rol = r.id_rol
             LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             LEFT JOIN Usuario creador ON u.creado_por = creador.id_usuario
             LEFT JOIN Usuario actualizador ON u.actualizado_por = actualizador.id_usuario
             WHERE u.id_usuario = ?
@@ -402,12 +411,15 @@ class UsuarioModel {
                 e.estado as empleado_activo,
                 a.nombre_area,
                 r.nombre_rol,
-                loc.nombre as ubicacion_nombre
+                loc.nombre as ubicacion_nombre,
+                up.avatar_url,
+                up.avatar_color
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
             LEFT JOIN Area a ON e.id_area = a.id_area
             LEFT JOIN Rol r ON u.id_rol = r.id_rol
             LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             WHERE u.id_empleado = ?
         `;
         const result = await query(sql, [idEmpleado]);
@@ -415,7 +427,7 @@ class UsuarioModel {
     }
 
     /**
-     * Obtener usuarios por rol del sistema
+     * Obtener usuarios por rol con su avatar actual
      * @param {string} rol 
      * @returns {Array}
      */
@@ -437,12 +449,15 @@ class UsuarioModel {
                 e.estado as empleado_activo,
                 a.nombre_area,
                 r.nombre_rol,
-                loc.nombre as ubicacion_nombre
+                loc.nombre as ubicacion_nombre,
+                up.avatar_url,
+                up.avatar_color
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
             LEFT JOIN Area a ON e.id_area = a.id_area
             LEFT JOIN Rol r ON u.id_rol = r.id_rol
             LEFT JOIN Ubicacion loc ON e.id_ubicacion = loc.id_ubicacion
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             WHERE r.nombre_rol = ? AND u.activo = 1
             ORDER BY e.apellido, e.nombre
         `;
@@ -462,9 +477,12 @@ class UsuarioModel {
                 CONCAT(e.nombre, ' ', e.apellido) as nombre_completo,
                 u.email as email_usuario,
                 u.id_rol,
-                u.activo as usuario_activo
+                u.activo as usuario_activo,
+                up.avatar_url,
+                up.avatar_color
             FROM Usuario u
             INNER JOIN Empleado e ON u.id_empleado = e.id_empleado
+            LEFT JOIN usuario_perfil up ON up.id_usuario = u.id_usuario
             WHERE u.activo = 1 
             AND (
                 u.username LIKE ? OR 

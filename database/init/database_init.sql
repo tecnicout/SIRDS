@@ -181,6 +181,40 @@ CREATE TABLE DetallePedidoCompras (
     FOREIGN KEY (id_talla) REFERENCES Talla(id_talla)
 );
 
+-- Tabla: RecepcionPedido
+CREATE TABLE RecepcionPedido (
+    id_recepcion INT AUTO_INCREMENT PRIMARY KEY,
+    id_pedido INT NOT NULL,
+    id_proveedor INT NULL,
+    proveedor_nombre VARCHAR(150),
+    documento_referencia VARCHAR(120),
+    fecha_recepcion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    observaciones TEXT,
+    usuario_registro VARCHAR(100),
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_pedido) REFERENCES PedidoCompras(id_pedido),
+    FOREIGN KEY (id_proveedor) REFERENCES Proveedor(id_proveedor)
+);
+CREATE INDEX idx_recepcion_id_pedido ON RecepcionPedido(id_pedido);
+
+-- Tabla: DetalleRecepcionPedido
+CREATE TABLE DetalleRecepcionPedido (
+    id_recepcion_detalle INT AUTO_INCREMENT PRIMARY KEY,
+    id_recepcion INT NOT NULL,
+    id_detalle_pedido INT NOT NULL,
+    id_dotacion INT NOT NULL,
+    id_talla INT NULL,
+    cantidad_recibida INT NOT NULL,
+    precio_unitario DECIMAL(12,2) DEFAULT NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_recepcion) REFERENCES RecepcionPedido(id_recepcion),
+    FOREIGN KEY (id_detalle_pedido) REFERENCES DetallePedidoCompras(id_detalle),
+    FOREIGN KEY (id_dotacion) REFERENCES Dotacion(id_dotacion),
+    FOREIGN KEY (id_talla) REFERENCES Talla(id_talla)
+);
+CREATE INDEX idx_detalle_recepcion_pedido_detalle ON DetalleRecepcionPedido(id_detalle_pedido);
+
 -- Tabla: EntregaDotacion
 CREATE TABLE EntregaDotacion (
     id_entrega INT AUTO_INCREMENT PRIMARY KEY,

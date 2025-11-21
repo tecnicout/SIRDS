@@ -20,6 +20,85 @@ class UbicacionController {
         }
     }
 
+    static async getEmployees(req, res) {
+        try {
+            const { id } = req.params;
+            const ubicacion = await UbicacionModel.getById(id);
+            if (!ubicacion) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Ubicación no encontrada'
+                });
+            }
+
+            const empleados = await UbicacionModel.getEmployeesByUbicacion(id);
+            res.json({
+                success: true,
+                data: empleados,
+                message: 'Empleados obtenidos correctamente'
+            });
+        } catch (error) {
+            console.error('Error al obtener empleados por ubicación:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error al obtener empleados por ubicación',
+                error: error.message
+            });
+        }
+    }
+
+    static async reassignEmployees(req, res) {
+        try {
+            const { id } = req.params;
+            const { nuevaUbicacionId } = req.body;
+
+            if (!nuevaUbicacionId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Debe seleccionar la nueva ubicación'
+                });
+            }
+
+            if (Number(id) === Number(nuevaUbicacionId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'La nueva ubicación debe ser diferente'
+                });
+            }
+
+            const origen = await UbicacionModel.getById(id);
+            if (!origen) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Ubicación origen no encontrada'
+                });
+            }
+
+            const destino = await UbicacionModel.getById(nuevaUbicacionId);
+            if (!destino) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Ubicación destino no encontrada'
+                });
+            }
+
+            const reasignados = await UbicacionModel.reassignEmployees(id, nuevaUbicacionId);
+
+            res.json({
+                success: true,
+                data: { reasignados },
+                message: `${reasignados} empleado(s) reasignado(s) a ${destino.nombre}`
+            });
+        } catch (error) {
+            console.error('Error al reasignar empleados:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error al reasignar empleados',
+                error: error.message
+            });
+        }
+    }
+
     // Obtener ubicación por ID
     static async getById(req, res) {
         try {
@@ -161,10 +240,7 @@ class UbicacionController {
                 });
             }
 
-            // Verificar cuántas áreas están relacionadas
-            const areasRelacionadas = await UbicacionModel.getRelatedAreas(id);
-
-            // Eliminar ubicación reasignando áreas automáticamente
+            // Eliminar ubicación reasignando entidades relacionadas automáticamente
             const resultado = await UbicacionModel.deleteWithAreasHandling(id);
             
             if (!resultado.success) {
@@ -174,17 +250,31 @@ class UbicacionController {
                 });
             }
 
-            // Mensaje específico según si había áreas relacionadas
+            const totalReassigned = resultado.totalReassigned ?? resultado.areasReassigned ?? 0;
+            const summary = resultado.reassignSummary || {};
+            const details = [];
+
+            if (summary.empleados) {
+                details.push(`${summary.empleados} empleado(s)`);
+            }
+            if (summary.stock) {
+                details.push(`${summary.stock} registro(s) de stock`);
+            }
+            if (summary.areas) {
+                details.push(`${summary.areas} área(s)`);
+            }
+
             let message = 'Ubicación eliminada correctamente';
-            if (areasRelacionadas > 0) {
-                message = `Ubicación eliminada correctamente. Las ${areasRelacionadas} área(s) relacionada(s) se reasignaron temporalmente.`;
+            if (details.length > 0) {
+                message = `Ubicación eliminada correctamente. ${details.join(', ')} se reasignaron temporalmente.`;
             }
 
             res.json({
                 success: true,
                 message: message,
                 data: {
-                    areasReasignadas: resultado.areasReassigned || 0,
+                    areasReasignadas: totalReassigned,
+                    detallesReasignacion: summary,
                     ubicacionTemporal: resultado.temporalLocationId
                 }
             });

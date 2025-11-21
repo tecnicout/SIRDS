@@ -9,6 +9,9 @@ router.get('/', PedidoController.list);
 router.get('/stats', PedidoController.stats);
 router.get('/faltantes/export', PedidoController.exportarFaltantes);
 router.post('/generar', PedidoController.generar);
+router.delete('/:id', PedidoController.remove);
+router.get('/:id/recepciones', PedidoController.listRecepciones);
+router.post('/:id/recepciones', PedidoController.registrarRecepcion);
 router.get('/:id/export', PedidoController.exportar);
 router.get('/:id', PedidoController.getById);
 

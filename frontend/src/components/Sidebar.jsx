@@ -1,26 +1,21 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import AccountProfileModal from './account/AccountProfileModal';
+import AccountPreferencesModal from './account/AccountPreferencesModal';
+import AccountNotificationsModal from './account/AccountNotificationsModal';
+import useStoredUser from '../hooks/useStoredUser';
 
 function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
   const location = useLocation();
-  const [user, setUser] = useState(null);
+  const [user, setStoredUser] = useStoredUser();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
+  const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
   
   const isActive = useCallback((path) => {
     return location.pathname === path;
   }, [location.pathname]);
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
-  }, []);
 
   // Cerrar menú de usuario al cambiar de ruta
   useEffect(() => {
@@ -28,6 +23,7 @@ function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
   }, [location.pathname]);
 
   const isAdmin = useMemo(() => user?.id_rol === 4, [user?.id_rol]);
+  const userAvatarUrl = useMemo(() => user?.avatar_url || null, [user?.avatar_url]);
 
   const getUserInitial = useMemo(() => {
     if (user?.nombre_completo) {
@@ -78,8 +74,8 @@ function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
   const handleLogout = useCallback(() => {
     // Limpiar localStorage
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    
+    setStoredUser(null);
+
     // Si hay función onLogout, usarla
     if (onLogout && typeof onLogout === 'function') {
       onLogout();
@@ -87,7 +83,21 @@ function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
       // Fallback: forzar recarga y redirección
       window.location.replace('/login');
     }
-  }, [onLogout]);
+  }, [onLogout, setStoredUser]);
+
+  const openAccountSection = useCallback((section) => {
+    if (section === 'profile') {
+      setProfileModalOpen(true);
+      return;
+    }
+    if (section === 'config') {
+      setPreferencesModalOpen(true);
+      return;
+    }
+    if (section === 'notifications') {
+      setNotificationsModalOpen(true);
+    }
+  }, []);
 
   return (
     <aside 
@@ -239,8 +249,15 @@ function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className={`w-full flex items-center px-3 py-3 rounded-lg hover:bg-gray-50 transition-colors ${collapsed ? 'justify-center' : 'space-x-3'}`}
               >
-                <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 border-2 border-gray-300 shadow-sm">
-                  {getUserInitial}
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 border-2 border-gray-300 shadow-sm overflow-hidden"
+                  style={!userAvatarUrl ? { backgroundColor: user?.avatar_color || '#9CA3AF' } : undefined}
+                >
+                  {userAvatarUrl ? (
+                    <img src={userAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    getUserInitial
+                  )}
                 </div>
                 <div className={`flex-1 text-left min-w-0 transition-all duration-500 ease-in-out ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'}`}>
                   <div className="font-medium text-gray-900 text-sm truncate">
@@ -260,14 +277,28 @@ function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
                     <div className="text-sm font-medium text-gray-900">Mi Cuenta</div>
                   </div>
                   
-                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  <button
+                    onClick={() => openAccountSection('config')}
+                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
                     <i className="bx bx-cog text-lg"></i>
                     <span>Configuración</span>
                   </button>
                   
-                  <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  <button
+                    onClick={() => openAccountSection('notifications')}
+                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
                     <i className="bx bx-bell text-lg"></i>
                     <span>Notificaciones</span>
+                  </button>
+
+                  <button
+                    onClick={() => openAccountSection('profile')}
+                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    <i className="bx bx-user text-lg"></i>
+                    <span>Editar perfil</span>
                   </button>
                   
                   <div className="border-t border-gray-100 mt-2 pt-2">
@@ -285,6 +316,12 @@ function Sidebar({ collapsed, onMouseEnter, onMouseLeave, onLogout }) {
           </li>
         </ul>
       </nav>
+      <AccountProfileModal
+        open={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+      />
+      <AccountPreferencesModal open={preferencesModalOpen} onClose={() => setPreferencesModalOpen(false)} />
+      <AccountNotificationsModal open={notificationsModalOpen} onClose={() => setNotificationsModalOpen(false)} />
     </aside>
   );
 }

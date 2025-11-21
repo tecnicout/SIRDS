@@ -1,4 +1,5 @@
 import api from '../config/axios';
+import { getToken, setToken, clearToken } from '../utils/tokenStorage';
 
 interface AuthUser {
   id_usuario: number;
@@ -24,11 +25,13 @@ const authService = {
   login: async (email: string, password: string): Promise<{ token: string; user: AuthUser }> => {
     const response = await api.post<LoginResponseRaw>('/auth/login', { email, password });
     if (!response.data.success) throw new Error('Credenciales inválidas');
-    return { token: response.data.data.token, user: response.data.data.usuario };
+    const token = response.data.data.token;
+    setToken(token);
+    return { token, user: response.data.data.usuario };
   },
 
   checkSession: async (): Promise<{ user: AuthUser }> => {
-    const token = localStorage.getItem('token');
+    const token = getToken();
     if (!token) throw new Error('No hay token');
     const response = await api.get<LoginResponseRaw>('/auth/validate');
     if (!response.data.success) throw new Error('Sesión inválida');
@@ -37,7 +40,7 @@ const authService = {
 
   logout: async (): Promise<void> => {
     try { await api.post('/auth/logout'); } catch {}
-    localStorage.removeItem('token');
+    clearToken();
   }
 };
 

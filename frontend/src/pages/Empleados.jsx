@@ -3,9 +3,11 @@ import DataTable from '../components/DataTable/DataTable';
 import { Modal, EditModal } from '../components/Modal';
 import ResourceHeader from '../components/UI/ResourceHeader';
 import CardPanel from '../components/UI/CardPanel';
+import useStoredUser from '../hooks/useStoredUser';
+import { getToken } from '../utils/tokenStorage';
 
 // Configuración de columnas para la tabla de empleados
-const EMPLEADOS_COLUMNS = [
+const buildEmpleadoColumns = (currentUser) => [
   {
     key: 'empleado_info',
     label: 'Empleado',
@@ -13,10 +15,18 @@ const EMPLEADOS_COLUMNS = [
     width: '20%',
     render: (value, row) => (
       <div className="flex items-center">
-        <div className="w-12 h-12 bg-gray-400 rounded-full flex items-center justify-center shadow-md border-2 border-gray-300">
-          <span className="text-white font-bold text-sm">
-            {(row.nombre?.charAt(0) || '') + (row.apellido?.charAt(0) || '')}
-          </span>
+        <div
+          className="w-12 h-12 rounded-full flex items-center justify-center shadow-md border-2 border-gray-200 overflow-hidden"
+          style={!((row.avatar_url || (currentUser && row.id_empleado === currentUser.id_empleado && currentUser.avatar_url))) ? { backgroundColor: row.avatar_color || (currentUser && row.id_empleado === currentUser.id_empleado ? currentUser.avatar_color : '#9CA3AF') } : undefined}
+        >
+          {(() => {
+            const effectiveAvatar = row.avatar_url || (currentUser && row.id_empleado === currentUser.id_empleado ? currentUser.avatar_url : null);
+            if (effectiveAvatar) {
+              return <img src={effectiveAvatar} alt={`${row.nombre} ${row.apellido}`} className="w-full h-full object-cover" />;
+            }
+            const initials = `${row.nombre?.charAt(0) || ''}${row.apellido?.charAt(0) || ''}`.trim() || 'NA';
+            return <span className="text-white font-bold text-sm">{initials}</span>;
+          })()}
         </div>
         <div className="ml-4">
           <div className="text-sm font-semibold text-gray-700">
@@ -159,6 +169,7 @@ import { EMPLEADO_FORM_FIELDS, EMPLEADO_VALIDATION_RULES } from '../components/M
 
 export default function Empleados() {
   // Estados principales
+  const [currentUser] = useStoredUser();
   const [empleados, setEmpleados] = useState([]);
   const [areas, setAreas] = useState([]);
   const [generos, setGeneros] = useState([]);
@@ -185,6 +196,7 @@ export default function Empleados() {
 
   // Toast notification system
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const empleadoColumns = useMemo(() => buildEmpleadoColumns(currentUser), [currentUser]);
 
   // Show toast function mejorada con íconos y mejor UX
   const showToast = (message, type = 'success') => {
@@ -199,7 +211,7 @@ export default function Empleados() {
     try {
       setIsLoading(true);
       setError('');
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch('/api/empleados', {
         headers: {
@@ -227,7 +239,7 @@ export default function Empleados() {
   // Fix: Usar useCallback para cargar áreas
   const cargarAreas = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       // Traer solo áreas activas
       const response = await fetch('/api/areas', {
@@ -253,7 +265,7 @@ export default function Empleados() {
   // Fix: Usar useCallback para cargar géneros
   const cargarGeneros = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch('/api/generos', {
         headers: {
@@ -278,7 +290,7 @@ export default function Empleados() {
   // Fix: Usar useCallback para cargar ubicaciones
   const cargarUbicaciones = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch('/api/ubicaciones', {
         headers: {
@@ -303,7 +315,7 @@ export default function Empleados() {
   // Cargar kits disponibles (activos)
   const cargarKits = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch('/api/kits', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -331,6 +343,21 @@ export default function Empleados() {
     cargarKits();
   }, [cargarEmpleados, cargarAreas, cargarGeneros, cargarUbicaciones, cargarKits]);
 
+  useEffect(() => {
+    if (!currentUser?.id_empleado) {
+      return;
+    }
+    setEmpleados((prev) => prev.map((empleado) => (
+      empleado.id_empleado === currentUser.id_empleado
+        ? {
+            ...empleado,
+            avatar_url: currentUser.avatar_url ?? empleado.avatar_url,
+            avatar_color: currentUser.avatar_color ?? empleado.avatar_color
+          }
+        : empleado
+    )));
+  }, [currentUser?.id_empleado, currentUser?.avatar_url, currentUser?.avatar_color]);
+
   // Función de búsqueda avanzada con useCallback
   const buscarEmpleados = useCallback(async (termino) => {
     if (!termino || termino.trim().length < 2) {
@@ -338,7 +365,7 @@ export default function Empleados() {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch(`/api/empleados/search?q=${encodeURIComponent(termino.trim())}`, {
         headers: {
@@ -397,7 +424,7 @@ export default function Empleados() {
   const crearEmpleado = useCallback(async (empleadoData) => {
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       // Limpiar datos antes de enviar
       const cleanData = Object.fromEntries(
@@ -451,7 +478,7 @@ export default function Empleados() {
   const actualizarEmpleado = useCallback(async (empleadoData) => {
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       // Limpiar datos antes de enviar
       const cleanData = Object.fromEntries(
@@ -505,7 +532,7 @@ export default function Empleados() {
   // Función para cambiar estado de empleado con useCallback y confirmación mejorada
   const cambiarEstadoEmpleado = useCallback(async (id, nuevoEstado) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       // Validar que tenemos los datos necesarios
       if (!id || !token) {
@@ -813,7 +840,7 @@ export default function Empleados() {
         <div className="overflow-x-auto">
           <DataTable
             data={empleadosPaginados}
-            columns={EMPLEADOS_COLUMNS}
+            columns={empleadoColumns}
             onRowAction={handleRowAction}
             loading={isLoading}
             emptyMessage="No se encontraron empleados"

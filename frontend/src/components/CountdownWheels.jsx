@@ -40,56 +40,54 @@ const CountdownWheels = ({ targetDate }) => {
   const formatValue = (value) => String(value).padStart(2, '0');
 
   return (
-    <div className="w-full">
-      <div className="flex flex-wrap items-center justify-center gap-6">
-        {units.map(({ key, label }) => {
-          const value = timeLeft[key];
-          const upperLimit = maxByUnit[key];
-          const previous = upperLimit ? (value + 1) % upperLimit : value + 1;
-          const next = Math.max(value - 1, 0);
+    <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:gap-3">
+      {units.map(({ key, label }) => {
+        const value = timeLeft[key];
+        const upperLimit = maxByUnit[key];
+        const previous = upperLimit ? (value + 1) % upperLimit : value + 1;
+        const next = Math.max(value - 1, 0);
 
-          return (
-            <div key={key} className="flex flex-col items-center gap-4 text-center">
-              <div
-                className="relative flex w-24 sm:w-28 max-w-[140px] flex-col items-center justify-center overflow-hidden rounded-[28px] border border-yellow-200/30 bg-gradient-to-b from-orange-200/30 via-zinc-800 to-zinc-950 px-4 py-10 text-3xl font-black uppercase tracking-tight text-orange-100 shadow-[0_25px_55px_rgba(0,0,0,0.65)] sm:py-12"
-                style={{
-                  height: '220px',
-                  perspective: '1200px'
-                }}
-              >
-                <span className="pointer-events-none absolute inset-0 rounded-[28px] border border-white/5" />
-                <span className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-b from-yellow-500/5 via-transparent to-yellow-700/70" />
-                <span className="pointer-events-none absolute inset-x-4 top-3 h-1 rounded-full bg-white/35 blur-md opacity-70" />
-                <span className="pointer-events-none absolute inset-x-4 bottom-3 h-1 rounded-full bg-yellow-700 blur-lg opacity-80" />
+        return (
+          <div key={key} className="flex flex-col items-center gap-1 text-center">
+            <div
+              className="relative flex w-9 sm:w-10 flex-col items-center justify-between overflow-hidden rounded-[14px] border border-[#EAD9A1] bg-gradient-to-b from-white via-[#FDF6E7] to-[#E4C982] px-1.5 py-1.5 text-[11px] font-black uppercase tracking-tight text-[#111] shadow-[0_6px_14px_rgba(0,0,0,0.1)]"
+              style={{
+                height: '64px',
+                perspective: '620px'
+              }}
+            >
+              <span className="pointer-events-none absolute inset-0 rounded-[16px] border border-white/60" />
+              <span className="pointer-events-none absolute inset-0 rounded-[16px] bg-gradient-to-b from-white/60 via-transparent to-[#D4AF37]/20" />
+              <span className="pointer-events-none absolute inset-x-2 top-1.5 h-1 rounded-full bg-white/80 blur-md" />
+              <span className="pointer-events-none absolute inset-x-2 bottom-1.5 h-1 rounded-full bg-[#D4AF37]/40 blur-lg" />
 
-                <div className="relative flex w-full flex-col items-center text-orange-100/40" style={{ transform: 'rotateX(8deg)' }}>
-                  <span className="text-3xl font-bold drop-shadow-[0_8px_15px_rgba(255,150,0,0.25)]">
-                    {formatValue(previous)}
-                  </span>
-                </div>
-
-                <div className="relative flex w-full flex-col items-center" style={{ transform: 'translateZ(18px)' }}>
-                  <span className="text-5xl font-black text-orange-50 drop-shadow-[0_0_28px_rgba(255,176,59,0.85)]">
-                    {formatValue(value)}
-                  </span>
-                </div>
-
-                <div className="relative flex w-full flex-col items-center text-orange-100/40" style={{ transform: 'rotateX(-8deg)' }}>
-                  <span className="text-3xl font-bold drop-shadow-[0_-8px_15px_rgba(255,150,0,0.25)]">
-                    {formatValue(next)}
-                  </span>
-                </div>
-
-                <span className="pointer-events-none absolute inset-x-0 top-1/3 h-px bg-white/10" />
-                <span className="pointer-events-none absolute inset-x-0 bottom-1/3 h-px bg-black/30" />
+              <div className="relative flex w-full flex-col items-center text-[#B0841F]/60" style={{ transform: 'rotateX(8deg)' }}>
+                <span className="text-[0.6rem] font-semibold drop-shadow-[0_3px_8px_rgba(212,175,55,0.25)]">
+                  {formatValue(previous)}
+                </span>
               </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.5em] text-black">
-                {label}
-              </p>
+
+              <div className="relative flex w-full flex-col items-center" style={{ transform: 'translateZ(10px)' }}>
+                <span className="text-sm sm:text-base font-black text-[#0D0D0D] drop-shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
+                  {formatValue(value)}
+                </span>
+              </div>
+
+              <div className="relative flex w-full flex-col items-center text-[#B0841F]/60" style={{ transform: 'rotateX(-8deg)' }}>
+                <span className="text-[0.6rem] font-semibold drop-shadow-[0_-3px_8px_rgba(212,175,55,0.25)]">
+                  {formatValue(next)}
+                </span>
+              </div>
+
+              <span className="pointer-events-none absolute inset-x-0 top-1/3 h-px bg-white/45" />
+              <span className="pointer-events-none absolute inset-x-0 bottom-1/3 h-px bg-[#D4AF37]/3" />
             </div>
-          );
-        })}
-      </div>
+            <p className="text-[0.35rem] sm:text-[0.42rem] font-semibold uppercase tracking-[0.28em] text-[#1F1F1F] opacity-80">
+              {label}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 };

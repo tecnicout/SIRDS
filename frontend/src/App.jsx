@@ -1,5 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
+import { setStoredUser } from './utils/userStorage';
+import { getToken, setToken, clearToken } from './utils/tokenStorage';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import 'boxicons/css/boxicons.min.css';
 import './index.css';
@@ -56,13 +58,13 @@ function LoginPage({ onLoginSuccess }) {
       const result = await response.json();
       
       if (result.success) {
-        // Guardar token en localStorage
-        localStorage.setItem('token', result.data.token);
+        // Guardar token en almacenamiento de sesión
+        setToken(result.data.token);
         
         // La nueva estructura envía datos del usuario directamente en la respuesta
         // ya no necesitamos decodificar el token manualmente
         if (result.data.usuario) {
-          localStorage.setItem('user', JSON.stringify({
+          setStoredUser({
             id_usuario: result.data.usuario.id_usuario,
             id_empleado: result.data.usuario.id_empleado,
             username: result.data.usuario.username,
@@ -72,12 +74,14 @@ function LoginPage({ onLoginSuccess }) {
             nombre_rol: result.data.usuario.nombre_rol,
             cargo: result.data.usuario.cargo,
             area: result.data.usuario.area,
-            ubicacion: result.data.usuario.ubicacion
-          }));
+            ubicacion: result.data.usuario.ubicacion,
+            avatar_url: result.data.usuario.avatar_url ?? null,
+            avatar_color: result.data.usuario.avatar_color ?? '#9CA3AF'
+          });
         } else {
           // Fallback: decodificar token si no viene usuario en respuesta
           const payload = JSON.parse(atob(result.data.token.split('.')[1]));
-          localStorage.setItem('user', JSON.stringify({
+          setStoredUser({
             id_usuario: payload.id_usuario,
             id_empleado: payload.id_empleado,
             username: payload.username,
@@ -87,8 +91,10 @@ function LoginPage({ onLoginSuccess }) {
             id_rol: payload.id_rol,
             nombre_rol: payload.nombre_rol,
             cargo: payload.cargo,
-            area: payload.nombre_area
-          }));
+            area: payload.nombre_area,
+            avatar_url: null,
+            avatar_color: '#9CA3AF'
+          });
         }
         
         // Notificar éxito
@@ -246,7 +252,7 @@ function App() {
   // Verificar autenticación al cargar la aplicación
   useEffect(() => {
     const validateSession = async () => {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       // Si no hay token, no autenticar
       if (!token) {
@@ -261,14 +267,14 @@ function App() {
         
         if (tokenPayload.exp && tokenPayload.exp < currentTime) {
           console.log('Token expirado, limpiando sesión');
-          localStorage.removeItem('token');
+          clearToken();
           localStorage.removeItem('user');
           setIsAuthenticated(false);
           return;
         }
       } catch (error) {
         console.error('Error parsing token:', error);
-        localStorage.removeItem('token');
+        clearToken();
         localStorage.removeItem('user');
         setIsAuthenticated(false);
         return;
@@ -291,14 +297,14 @@ function App() {
             console.log('Sesión validada correctamente');
           } else {
             // Token inválido
-            localStorage.removeItem('token');
+            clearToken();
             localStorage.removeItem('user');
             setIsAuthenticated(false);
             console.log('Token inválido según servidor');
           }
         } else {
           // Error de validación
-          localStorage.removeItem('token');
+          clearToken();
           localStorage.removeItem('user');
           setIsAuthenticated(false);
           console.log('Error de validación:', response.status);
@@ -314,7 +320,7 @@ function App() {
           setIsAuthenticated(true);
           console.log('Trabajando offline con token válido');
         } else {
-          localStorage.removeItem('token');
+          clearToken();
           localStorage.removeItem('user');
           setIsAuthenticated(false);
           console.log('Token expirado y sin conexión');
@@ -336,7 +342,7 @@ function App() {
     if (!isAuthenticated) return;
 
     const checkSessionPeriodically = async () => {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       if (!token) {
         setIsAuthenticated(false);
@@ -370,18 +376,6 @@ function App() {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
-  // Limpiar token al cerrar la pestaña/ventana (evita sesión persistente tras cerrar)
-  useEffect(() => {
-    const clearOnUnload = () => {
-      try {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      } catch (_) { /* noop */ }
-    };
-    window.addEventListener('beforeunload', clearOnUnload);
-    return () => window.removeEventListener('beforeunload', clearOnUnload);
-  }, []);
-
   // Detectar cuando se cierra la ventana/pestaña para limpiar datos sensibles
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -414,8 +408,8 @@ function App() {
 
   const handleLogout = () => {
     // Limpiar localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearToken();
+    setStoredUser(null);
     
     // Actualizar estado de autenticación
     setIsAuthenticated(false);
@@ -839,29 +833,10 @@ function LandingPage() {
       {/* Hero Section (mejorado: título centrado a lo largo de toda la pantalla) */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[#F5F2E8]"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
-          
-          {/* Contenido centrado a lo largo de toda la pantalla */}
-          <div className="text-center">
-            <div className="mb-10">
-              {nextDelivery.loading ? (
-                <p className="text-base md:text-lg text-gray-500">Consultando próxima fecha de entrega...</p>
-              ) : nextDelivery.data ? (
-                <div className="inline-flex flex-col items-center bg-white/70 border border-[#D4AF37] rounded-3xl shadow-lg px-6 py-4 gap-4">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.2em] text-[#B39237] font-semibold">Próxima entrega de dotación</p>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {new Date(nextDelivery.data.fecha_entrega_iso).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <CountdownWheels targetDate={nextDeliveryDate} />
-                </div>
-              ) : (
-                <p className="text-base md:text-lg text-gray-500">
-                  {nextDelivery.error || 'Aún no hay fecha de entrega programada'}
-                </p>
-              )}
-            </div>
+        <div className="relative w-full px-6 sm:px-8 lg:px-12 pt-8 pb-16 md:pb-24">
+          <div className="relative">
+            {/* Contenido principal */}
+            <div className="text-center pt-12 sm:pt-16 lg:pt-20 max-w-5xl mx-auto px-2">
             <Suspense fallback={
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-gray-900 leading-tight mb-8">
                 <span className="block">Sistema</span>
@@ -887,15 +862,15 @@ function LandingPage() {
             </Suspense>
 
             <p className="text-xl md:text-2xl text-gray-600 leading-relaxed max-w-4xl mx-auto">
-              SIRDS es la plataforma profesional diseñada para gestionar de manera eficiente y controlada todas las dotaciones de uniformes, equipos de protección personal y herramientas en Molino Sonora.
+              SIRDS es la plataforma profesional diseñada para gestionar de manera eficiente y controlada todas las dotaciones de uniformes y equipos de protección personal en Agroindustrial Molino Sonora AP SAS.
             </p>
+            </div>
           </div>
 
         </div>
       </section>
-      
-      
-    <section className="relative overflow-hidden">
+
+      <section className="relative overflow-hidden">
   <div className="absolute inset-0 bg-[#F5F2E8]"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
@@ -1356,6 +1331,32 @@ function LandingPage() {
           </div>
         </div>
       </footer>
+      {nextDelivery && (
+        <div className="fixed bottom-4 right-3 sm:right-6 z-40 w-[230px] sm:w-[250px] max-w-[90vw]">
+          <div className="bg-white border border-[#D4AF37] rounded-xl shadow-xl px-3.5 py-3 space-y-2">
+            {nextDelivery.loading ? (
+              <p className="text-xs text-gray-500">Consultando próxima fecha de entrega...</p>
+            ) : nextDelivery.data ? (
+              <>
+                <div className="space-y-1">
+                  <p className="text-[0.46rem] uppercase tracking-[0.35em] text-[#B39237] font-semibold">
+                    Próxima entrega de dotación
+                  </p>
+                  <p className="text-base font-bold text-gray-900 leading-tight">
+                    {new Date(nextDelivery.data.fecha_entrega_iso).toLocaleDateString()}
+                  </p>
+                  <p className="text-[0.65rem] text-gray-500">Planifica el alistamiento con anticipación.</p>
+                </div>
+                <CountdownWheels targetDate={nextDeliveryDate} />
+              </>
+            ) : (
+              <p className="text-xs text-gray-500">
+                {nextDelivery.error || 'Aún no hay fecha de entrega programada'}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {showRegistrarModal && <PublicRegistrarModal onClose={closeRegistrar} />}
     </>
   );

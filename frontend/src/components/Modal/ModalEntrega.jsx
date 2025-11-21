@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
+import { getToken } from '../../utils/tokenStorage';
 
 const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
   const [formData, setFormData] = useState({
@@ -24,6 +25,11 @@ const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
   const [requiereTalla, setRequiereTalla] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const inputRef = useRef(null);
+
+  const buildAuthHeaders = () => {
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   // Lista de dotaciones a mostrar: preferir las dotaciones del kit (kitData) para
   // asegurar que se muestren solo los elementos asociados al área. Si no hay
@@ -68,7 +74,7 @@ const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
 
     try {
       const res = await fetch('http://localhost:3001/api/dotaciones/empleado/' + encodeURIComponent(formData.documento), {
-        headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') },
+        headers: buildAuthHeaders(),
         cache: 'no-store'
       });
       const result = await res.json();
@@ -117,7 +123,7 @@ const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
   useEffect(() => {
     const cargarTallasPorItem = async () => {
       if (!empleadoData || !Array.isArray(availableDotaciones) || availableDotaciones.length === 0) return;
-      const token = localStorage.getItem('token') || '';
+      const authHeaders = buildAuthHeaders();
       const nuevasOpciones = { ...tallasPorItemOptions };
       const nuevasSelecciones = { ...tallasSeleccionadas };
 
@@ -128,7 +134,7 @@ const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
         if (Array.isArray(nuevasOpciones[d.id_dotacion]) && nuevasOpciones[d.id_dotacion].length > 0) continue;
         try {
           const resp = await fetch(`http://localhost:3001/api/dotaciones/tallas/${d.id_dotacion}/${empleadoData.id_empleado}`, {
-            headers: { Authorization: 'Bearer ' + token }
+            headers: authHeaders
           });
           const json = await resp.json();
           const opts = Array.isArray(json?.data) ? json.data : [];
@@ -168,7 +174,7 @@ const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
         (async () => {
           try {
             const tallasRes = await fetch('http://localhost:3001/api/dotaciones/tallas/' + value + '/' + empleadoData.id_empleado, {
-              headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') }
+              headers: buildAuthHeaders()
             });
             const tallasJson = await tallasRes.json();
             if (tallasJson && tallasJson.success) {
@@ -224,7 +230,7 @@ const ModalEntrega = ({ isOpen, onClose, onEntregaRegistrada }) => {
 
       const res = await fetch('http://localhost:3001/api/kits/entregar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('token') || '') },
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
         body: JSON.stringify(payload)
       });
       const json = await res.json();

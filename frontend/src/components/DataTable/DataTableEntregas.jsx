@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getToken } from '../../utils/tokenStorage';
 
 const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
   const [entregas, setEntregas] = useState([]);
@@ -37,7 +38,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
   useEffect(() => {
     const cargarCicloActivo = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getToken();
         const response = await fetch('http://localhost:3001/api/ciclos/activo', {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -57,10 +58,28 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
     cargarCicloActivo();
   }, []);
 
-  const cargarEntregas = useCallback(async () => {
+  // Cargar datos (sin bloquear los filtros)
+  useEffect(() => {
+    cargarEntregas();
+  }, [refreshTrigger, debouncedBusqueda, filtros.estado, filtros.area, filtros.kit, paginacion.paginaActual]);
+
+  // Cargar áreas solo una vez (o cuando realmente se requiera)
+  useEffect(() => {
+    cargarAreas();
+  }, []);
+
+  // Asegurar que `areas` siempre sea un array (protección adicional)
+  useEffect(() => {
+    if (!Array.isArray(areas)) {
+      const normalized = Array.isArray(areas?.data) ? areas.data : [];
+      setAreas(normalized);
+    }
+  }, [areas]);
+
+  const cargarEntregas = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const queryParams = new URLSearchParams({
         page: paginacion.paginaActual,
@@ -69,9 +88,10 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
         estado: filtros.estado,
         area: filtros.area,
         kit: filtros.kit,
-        compat: '1'
+        compat: '1' // forzar modo compatibilidad basado en entregadotacion
       });
 
+      // Si hay un ciclo activo, añadir los parámetros de fecha
       if (cicloActivo) {
         queryParams.append('fecha_desde', cicloActivo.fecha_inicio_ventana);
         queryParams.append('fecha_hasta', cicloActivo.fecha_fin_ventana);
@@ -85,6 +105,10 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
 
       if (response.ok) {
         const data = await response.json();
+        // Normalizar distintos formatos de respuesta:
+        // - { success: true, data: [...] }
+        // - { entregas: [...], total: N }
+        // - [...] (array)
         let entregasData = [];
         let total = 0;
 
@@ -96,6 +120,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
           total = data.total ?? (Array.isArray(entregasData) ? entregasData.length : 0);
         }
 
+        // Filtro cliente por estado/kit (fallback si el backend no filtra)
         let list = entregasData || [];
         if (filtros.estado) {
           const est = String(filtros.estado).toLowerCase();
@@ -113,6 +138,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
           totalItems: filtros.estado ? list.length : total
         }));
       } else {
+        // Intento de respaldo: intentar una vez más en compat (por si el backend no lo soporta aún)
         try {
             const compatParams = new URLSearchParams({
             page: paginacion.paginaActual,
@@ -129,6 +155,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
           if (resp2.ok) {
             const data2 = await resp2.json();
             const list2 = Array.isArray(data2?.data) ? data2.data : (Array.isArray(data2?.entregas) ? data2.entregas : []);
+            // Filtro cliente por estado/kit (fallback)
             let list = list2 || [];
             if (filtros.estado) {
               const est = String(filtros.estado).toLowerCase();
@@ -157,30 +184,11 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
     } finally {
       setLoading(false);
     }
-  }, [cicloActivo, debouncedBusqueda, filtros.area, filtros.estado, filtros.kit, filtros.busqueda, paginacion.itemsPorPagina, paginacion.paginaActual]);
-
-  // Cargar datos (sin bloquear los filtros)
-  useEffect(() => {
-    cargarEntregas();
-  }, [cargarEntregas, refreshTrigger]);
-
-  // Cargar áreas solo una vez (o cuando realmente se requiera)
-  useEffect(() => {
-    cargarAreas();
-  }, []);
-
-  // Asegurar que `areas` siempre sea un array (protección adicional)
-  useEffect(() => {
-    if (!Array.isArray(areas)) {
-      const normalized = Array.isArray(areas?.data) ? areas.data : [];
-      setAreas(normalized);
-    }
-  }, [areas]);
-
+  };
 
   const cargarAreas = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
   const response = await fetch('http://localhost:3001/api/areas', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -249,7 +257,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
     setMostrandoDetalle(true);
     setDetalleItems([]);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const resp = await fetch(`http://localhost:3001/api/dotaciones/entregas/${entrega.id_entrega}/items`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -274,7 +282,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
   const guardarEdicion = async () => {
     try {
       if (!entregaSeleccionada) return;
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const resp = await fetch(`http://localhost:3001/api/dotaciones/entregas/${entregaSeleccionada.id_entrega}`, {
         method: 'PUT',
         headers: {
@@ -301,7 +309,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
     const confirmar = window.confirm('¿Eliminar esta entrega? Esta acción no se puede deshacer.');
     if (!confirmar) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const resp = await fetch(`http://localhost:3001/api/dotaciones/entregas/${entrega.id_entrega}`, {
         method: 'DELETE',
         headers: {
@@ -322,7 +330,7 @@ const DataTableEntregas = ({ refreshTrigger, onChanged }) => {
 
   const exportarExcel = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const queryParams = new URLSearchParams({
         search: filtros.busqueda,
         estado: filtros.estado,

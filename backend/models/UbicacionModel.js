@@ -7,6 +7,22 @@ class UbicacionModel {
         return await query(sql);
     }
 
+    static async getEmployeesByUbicacion(id) {
+        const sql = `
+            SELECT id_empleado, Identificacion, nombre, apellido, cargo, email
+            FROM empleado
+            WHERE id_ubicacion = ?
+            ORDER BY nombre
+        `;
+        return await query(sql, [id]);
+    }
+
+    static async reassignEmployees(idOrigen, idDestino) {
+        const sql = 'UPDATE empleado SET id_ubicacion = ? WHERE id_ubicacion = ?';
+        const result = await query(sql, [idDestino, idOrigen]);
+        return result.affectedRows;
+    }
+
     // Obtener una ubicación por ID
     static async getById(id) {
         const sql = 'SELECT * FROM ubicacion WHERE id_ubicacion = ?';
@@ -43,38 +59,71 @@ class UbicacionModel {
         return 0;
     }
 
-    // Desvincular áreas relacionadas y eliminar ubicación
+    // Desvincular entidades relacionadas y eliminar ubicación
     static async deleteWithAreasHandling(id) {
         try {
-            // Buscar o crear ubicación temporal para reasignar áreas
-            let ubicacionTemporal = await query(
-                "SELECT id_ubicacion FROM ubicacion WHERE nombre = 'UBICACIÓN TEMPORAL - REASIGNADA' LIMIT 1"
-            );
-            
-            if (ubicacionTemporal.length === 0) {
-                // Crear ubicación temporal
-                const insertTempSql = `
-                    INSERT INTO ubicacion (nombre, tipo, direccion) 
-                    VALUES ('UBICACIÓN TEMPORAL - REASIGNADA', 'bodega', 'Áreas reasignadas temporalmente por eliminación de ubicación')
+            const relationTargets = [
+                { table: 'empleado', column: 'id_ubicacion', key: 'empleados' },
+                { table: 'stockdotacion', column: 'id_ubicacion', key: 'stock' },
+                { table: 'area', column: 'id_ubicacion', key: 'areas' }
+            ];
+
+            const tableHasColumn = async (table, column) => {
+                const sql = `
+                    SELECT COUNT(*) AS count
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = ?
+                      AND column_name = ?
                 `;
-                const insertResult = await query(insertTempSql);
-                ubicacionTemporal = [{ id_ubicacion: insertResult.insertId }];
+                const [result] = await query(sql, [table, column]);
+                return result?.count > 0;
+            };
+
+            const targetsWithColumn = [];
+            for (const target of relationTargets) {
+                if (await tableHasColumn(target.table, target.column)) {
+                    targetsWithColumn.push(target);
+                }
             }
 
-            const idUbicacionTemporal = ubicacionTemporal[0].id_ubicacion;
-            
-            // Reasignar áreas a ubicación temporal
-            const reassignSql = 'UPDATE area SET id_ubicacion = ? WHERE id_ubicacion = ?';
-            const reassignResult = await query(reassignSql, [idUbicacionTemporal, id]);
+            let temporalLocationId = null;
+            const reassignSummary = {};
+            let totalReassigned = 0;
 
-            // Luego eliminar la ubicación original
+            if (targetsWithColumn.length > 0) {
+                let ubicacionTemporal = await query(
+                    "SELECT id_ubicacion FROM ubicacion WHERE nombre = 'UBICACIÓN TEMPORAL - REASIGNADA' LIMIT 1"
+                );
+
+                if (ubicacionTemporal.length === 0) {
+                    const insertTempSql = `
+                        INSERT INTO ubicacion (nombre, tipo, direccion) 
+                        VALUES ('UBICACIÓN TEMPORAL - REASIGNADA', 'bodega', 'Áreas reasignadas temporalmente por eliminación de ubicación')
+                    `;
+                    const insertResult = await query(insertTempSql);
+                    ubicacionTemporal = [{ id_ubicacion: insertResult.insertId }];
+                }
+
+                temporalLocationId = ubicacionTemporal[0].id_ubicacion;
+
+                for (const target of targetsWithColumn) {
+                    const updateSql = `UPDATE ${target.table} SET ${target.column} = ? WHERE ${target.column} = ?`;
+                    const updateResult = await query(updateSql, [temporalLocationId, id]);
+                    reassignSummary[target.key] = updateResult.affectedRows;
+                    totalReassigned += updateResult.affectedRows;
+                }
+            }
+
             const deleteSql = 'DELETE FROM ubicacion WHERE id_ubicacion = ?';
             const deleteResult = await query(deleteSql, [id]);
-            
+
             return {
                 success: deleteResult.affectedRows > 0,
-                areasReassigned: reassignResult.affectedRows,
-                temporalLocationId: idUbicacionTemporal
+                areasReassigned: totalReassigned,
+                temporalLocationId,
+                reassignSummary,
+                totalReassigned
             };
         } catch (error) {
             throw error;

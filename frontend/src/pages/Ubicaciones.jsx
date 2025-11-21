@@ -1,90 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import DataTable from '../components/DataTable/DataTable';
 import { ViewModal, EditModal } from '../components/Modal';
+import Modal from '../components/Modal/Modal';
 import ResourceHeader from '../components/UI/ResourceHeader';
 import CardPanel from '../components/UI/CardPanel';
+import { getToken } from '../utils/tokenStorage';
 
-// Configuración de columnas para la tabla de ubicaciones
-const UBICACIONES_COLUMNS = [
-  {
-    key: 'nombre',
-    label: 'Nombre',
-    sortable: true,
-    width: '35%',
-    render: (value, row) => (
-      <div className="flex items-center py-2 px-3">
-        <div className="w-8 h-8 bg-gradient-to-r from-[#B39237] to-[#D4AF37] rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
-          <i className="bx bx-map-pin text-white text-sm"></i>
-        </div>
-        <div className="ml-3 min-w-0 flex-1">
-          <div className="text-sm font-semibold text-gray-700">
-            {value}
-          </div>
-          <div className="text-xs text-gray-500">
-            ID: {row.id_ubicacion}
-          </div>
-        </div>
-      </div>
-    )
-  },
-  {
-    key: 'tipo',
-    label: 'Tipo',
-    sortable: true,
-    width: '25%',
-    render: (value, row) => {
-      const getTypeConfig = (tipo) => {
-        switch (tipo) {
-          case 'planta':
-            return {
-              color: 'text-[#B39237]',
-              icon: 'bx-buildings',
-              label: 'Planta'
-            };
-          case 'maquila':
-            return {
-              color: 'text-gray-600',
-              icon: 'bx-cog',
-              label: 'Maquila'
-            };
-          case 'bodega':
-          default:
-            return {
-              color: 'text-gray-600',
-              icon: 'bx-package',
-              label: 'Bodega'
-            };
-        }
-      };
-
-      const config = getTypeConfig(value);
-      
-      return (
-        <div className="flex items-center py-2 px-2">
-          <span className={`inline-flex items-center text-sm font-bold ${config.color}`}>
-            <i className={`bx ${config.icon} text-base mr-2`}></i>
-            {config.label}
-          </span>
-        </div>
-      );
-    }
-  },
-  {
-    key: 'direccion',
-    label: 'Dirección',
-    width: '40%',
-    render: (value, row) => (
-      <div className="flex items-center py-2 px-3">
-        <div className="w-6 h-6 bg-gray-400 rounded flex items-center justify-center flex-shrink-0">
-          <i className="bx bx-map text-white text-xs"></i>
-        </div>
-        <div className="ml-2 text-sm text-gray-700 min-w-0 flex-1">
-          {value || <span className="text-gray-400 italic">No especificada</span>}
-        </div>
-      </div>
-    )
-  }
+const TIPO_FILTERS = [
+  { key: 'all', label: 'Todas' },
+  { key: 'planta', label: 'Plantas' },
+  { key: 'maquila', label: 'Maquilas' },
+  { key: 'bodega', label: 'Bodegas' }
 ];
+
+const TIPO_META = {
+  planta: {
+    icon: 'bx-buildings',
+    label: 'Planta',
+    badge: 'bg-blue-50 text-blue-700',
+    chip: 'bg-blue-100/70 text-blue-800'
+  },
+  maquila: {
+    icon: 'bx-cog',
+    label: 'Maquila',
+    badge: 'bg-purple-50 text-purple-700',
+    chip: 'bg-purple-100/70 text-purple-800'
+  },
+  bodega: {
+    icon: 'bx-package',
+    label: 'Bodega',
+    badge: 'bg-emerald-50 text-emerald-700',
+    chip: 'bg-emerald-100/70 text-emerald-800'
+  }
+};
+
+const DEFAULT_META = {
+  icon: 'bx-map',
+  label: 'Ubicación',
+  badge: 'bg-gray-100 text-gray-600',
+  chip: 'bg-gray-100 text-gray-700'
+};
 
 // Configuración de campos para el modal de vista
 const UBICACION_VIEW_FIELDS = [
@@ -154,9 +108,16 @@ export default function Ubicaciones() {
   const [selectedUbicacion, setSelectedUbicacion] = useState(null);
   const [editingUbicacion, setEditingUbicacion] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reassignModalOpen, setReassignModalOpen] = useState(false);
+  const [empleadosRelacionados, setEmpleadosRelacionados] = useState([]);
+  const [ubicacionPendiente, setUbicacionPendiente] = useState(null);
+  const [nuevaUbicacionId, setNuevaUbicacionId] = useState('');
+  const [isReassigning, setIsReassigning] = useState(false);
+  const [reassignError, setReassignError] = useState('');
 
   // Estados para búsqueda y filtros
   const [searchQuery, setSearchQuery] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('all');
 
   // Cargar ubicaciones al iniciar el componente
   useEffect(() => {
@@ -166,7 +127,7 @@ export default function Ubicaciones() {
   const cargarUbicaciones = async () => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch('/api/ubicaciones', {
         headers: {
@@ -198,7 +159,7 @@ export default function Ubicaciones() {
   const handleSubmit = async (formData) => {
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const url = editingUbicacion 
         ? `/api/ubicaciones/${editingUbicacion.id_ubicacion}`
         : '/api/ubicaciones';
@@ -256,35 +217,116 @@ export default function Ubicaciones() {
     setShowEditModal(true);
   };
 
-  const handleDelete = async (ubicacion) => {
-    if (window.confirm(`¿Está seguro de eliminar la ubicación "${ubicacion.nombre}"?`)) {
-      try {
-        const token = localStorage.getItem('token');
-        
-        const response = await fetch(`/api/ubicaciones/${ubicacion.id_ubicacion}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-          await cargarUbicaciones();
-          setError('');
-          // Mostrar mensaje si había áreas reasignadas
-          if (result.data && result.data.areasReasignadas > 0) {
-            alert(`Ubicación eliminada. Se reasignaron ${result.data.areasReasignadas} área(s) a ubicación temporal.`);
-          }
-        } else {
-          setError(result.message);
+  const performDelete = async (ubicacion) => {
+    try {
+      const token = getToken();
+
+      const response = await fetch(`/api/ubicaciones/${ubicacion.id_ubicacion}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      } catch (error) {
-        console.error('Error al eliminar ubicación:', error);
-        setError('Error al eliminar la ubicación');
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        await cargarUbicaciones();
+        setError('');
+        if (result.data && result.data.areasReasignadas > 0) {
+          alert(`Ubicación eliminada. ${result.data.areasReasignadas} registro(s) se reasignaron temporalmente.`);
+        }
+        return true;
       }
+
+      setError(result.message);
+      return false;
+    } catch (error) {
+      console.error('Error al eliminar ubicación:', error);
+      setError('Error al eliminar la ubicación');
+      return false;
+    }
+  };
+
+  const handleDelete = async (ubicacion) => {
+    setReassignError('');
+    try {
+      const token = getToken();
+      const response = await fetch(`/api/ubicaciones/${ubicacion.id_ubicacion}/empleados`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Error al verificar empleados relacionados');
+      }
+
+      if (result.data && result.data.length > 0) {
+        setEmpleadosRelacionados(result.data);
+        setUbicacionPendiente(ubicacion);
+        setNuevaUbicacionId('');
+        setReassignModalOpen(true);
+        return;
+      }
+    } catch (error) {
+      console.error('Error al verificar empleados relacionados:', error);
+      setError(error.message || 'Error al verificar empleados relacionados');
+      return;
+    }
+
+    if (window.confirm(`¿Está seguro de eliminar la ubicación "${ubicacion.nombre}"?`)) {
+      await performDelete(ubicacion);
+    }
+  };
+
+  const handleReassignModalClose = () => {
+    setReassignModalOpen(false);
+    setUbicacionPendiente(null);
+    setEmpleadosRelacionados([]);
+    setNuevaUbicacionId('');
+    setReassignError('');
+  };
+
+  const handleReassignSubmit = async () => {
+    if (!ubicacionPendiente) return;
+    if (!nuevaUbicacionId) {
+      setReassignError('Debes seleccionar la nueva ubicación.');
+      return;
+    }
+
+    setIsReassigning(true);
+    setReassignError('');
+
+    try {
+      const ubicacionAEliminar = ubicacionPendiente;
+      const token = getToken();
+      const response = await fetch(`/api/ubicaciones/${ubicacionPendiente.id_ubicacion}/reasignar-empleados`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ nuevaUbicacionId: Number(nuevaUbicacionId) })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Error al reasignar empleados');
+      }
+
+      handleReassignModalClose();
+      if (ubicacionAEliminar) {
+        await performDelete(ubicacionAEliminar);
+      }
+    } catch (error) {
+      console.error('Error al reasignar empleados:', error);
+      setReassignError(error.message || 'Error al reasignar empleados');
+    } finally {
+      setIsReassigning(false);
     }
   };
 
@@ -294,11 +336,16 @@ export default function Ubicaciones() {
   };
 
   // Función para filtrar ubicaciones
-  const ubicacionesFiltradas = ubicaciones.filter(ubicacion =>
-    ubicacion.nombre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    ubicacion.tipo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    ubicacion.direccion?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const ubicacionesFiltradas = ubicaciones.filter((ubicacion) => {
+    const query = searchQuery.toLowerCase();
+    const tipo = ubicacion.tipo?.toLowerCase() || '';
+    const matchesSearch =
+      ubicacion.nombre?.toLowerCase().includes(query) ||
+      tipo.includes(query) ||
+      ubicacion.direccion?.toLowerCase().includes(query);
+    const matchesTipo = tipoFiltro === 'all' || tipo === tipoFiltro;
+    return matchesSearch && matchesTipo;
+  });
 
   if (isLoading) {
     return (
@@ -344,33 +391,114 @@ export default function Ubicaciones() {
         </div>
       )}
 
-      {/* Tabla dentro de CardPanel */}
+      {/* Listado renovado */}
       <CardPanel title="Listado de Ubicaciones" icon="bx-map">
-        <DataTable
-          columns={UBICACIONES_COLUMNS}
-          data={ubicacionesFiltradas}
-          rowKey="id_ubicacion"
-          loading={isLoading}
-          error={error}
-          searchQuery={searchQuery}
-          onSearch={setSearchQuery}
-          onRowAction={handleRowAction}
-          rowActions={['view', 'edit', 'delete']}
-          emptyState={
-            <div className="p-8 text-center text-gray-500">
-              <i className="bx bx-map-pin text-4xl text-gray-400 mb-4"></i>
-              <h3 className="text-lg font-medium text-gray-700 mb-2">No hay ubicaciones disponibles</h3>
-              <p className="text-gray-500 mb-4">Comience creando una nueva ubicación</p>
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex-1">
+              <div className="relative">
+                <i className="bx bx-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por nombre, tipo o dirección"
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-10 py-2.5 text-sm text-gray-700 focus:border-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#E2BE69]/40"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {TIPO_FILTERS.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setTipoFiltro(filter.key)}
+                  className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
+                    tipoFiltro === filter.key
+                      ? 'border-[#E2BE69] bg-[#FFF8E7] text-[#6F581B]'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-[#E2BE69]/60'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {ubicacionesFiltradas.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-gray-200 bg-white/80 px-6 py-12 text-center">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F9F4E7] text-[#B39237]">
+                <i className="bx bx-map-pin text-2xl"></i>
+              </div>
+              <p className="text-base font-semibold text-gray-800">No encontramos ubicaciones con los filtros actuales.</p>
+              <p className="mt-1 text-sm text-gray-500">Ajusta la búsqueda o registra una nueva ubicación.</p>
               <button
                 onClick={handleNewUbicacion}
-                className="bg-gradient-to-r from-[#B39237] to-[#D4AF37] hover:from-[#A0812F] hover:to-[#C19B2F] text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 mx-auto"
+                className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#B39237] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[#9C7F2F]"
               >
                 <i className="bx bx-plus"></i>
-                <span>Crear Primera Ubicación</span>
+                Crear Ubicación
               </button>
             </div>
-          }
-        />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {ubicacionesFiltradas.map((ubicacion) => {
+                const tipo = ubicacion.tipo?.toLowerCase();
+                const meta = TIPO_META[tipo] || DEFAULT_META;
+
+                return (
+                  <div key={ubicacion.id_ubicacion} className="rounded-3xl border border-gray-100 bg-white/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{ubicacion.nombre}</p>
+                        <p className="text-xs text-gray-500">ID #{ubicacion.id_ubicacion}</p>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[0.65rem] font-semibold ${meta.badge}`}>
+                        <i className={`bx ${meta.icon} text-sm`}></i>
+                        {meta.label}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 space-y-3 text-sm text-gray-600">
+                      <div className="flex items-start gap-2">
+                        <i className="bx bx-map text-[#B39237] text-base"></i>
+                        <p className="leading-snug">{ubicacion.direccion || <span className="text-gray-400 italic">Dirección no especificada</span>}</p>
+                      </div>
+                      
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => handleRowAction('view', ubicacion)}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-gray-700 hover:border-[#B39237]"
+                      >
+                        <i className="bx bx-show"></i>
+                        Ver
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRowAction('edit', ubicacion)}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#D4AF37] bg-[#FFF8E7] px-3 py-2 text-[#6F581B] hover:bg-[#F9EDCC]"
+                      >
+                        <i className="bx bx-edit"></i>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRowAction('delete', ubicacion)}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-100 px-3 py-2 text-red-600 hover:bg-red-50"
+                      >
+                        <i className="bx bx-trash"></i>
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </CardPanel>
 
       
@@ -398,6 +526,83 @@ export default function Ubicaciones() {
         isSubmitting={isSubmitting}
         submitText={editingUbicacion ? 'Actualizar' : 'Crear'}
       />
+
+      <Modal
+        isOpen={reassignModalOpen}
+        onClose={handleReassignModalClose}
+        title="Reasignar empleados antes de eliminar"
+        size="lg"
+        footer={(
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+            <button
+              type="button"
+              onClick={handleReassignModalClose}
+              className="inline-flex w-full sm:w-auto items-center justify-center rounded-2xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
+              disabled={isReassigning}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleReassignSubmit}
+              className="inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-gradient-to-r from-[#B39237] to-[#D4AF37] px-6 py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-60"
+              disabled={isReassigning || !nuevaUbicacionId}
+            >
+              {isReassigning ? 'Procesando...' : 'Reasignar y eliminar'}
+            </button>
+          </div>
+        )}
+      >
+        <div className="space-y-5">
+          <p className="text-sm text-gray-600">
+            No se puede eliminar <span className="font-semibold">{ubicacionPendiente?.nombre}</span> porque tiene empleados asociados.
+            Selecciona la nueva ubicación para reasignarlos y luego completaremos la eliminación automáticamente.
+          </p>
+
+          {reassignError && (
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">
+              {reassignError}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+              Empleados relacionados ({empleadosRelacionados.length})
+            </label>
+            <div className="max-h-56 overflow-y-auto rounded-2xl border border-gray-100 bg-white/80">
+              {empleadosRelacionados.map((empleado) => (
+                <div key={empleado.id_empleado} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-none">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{empleado.nombre} {empleado.apellido}</p>
+                    <p className="text-xs text-gray-500">#{empleado.Identificacion} · {empleado.cargo || 'Sin cargo'}</p>
+                  </div>
+                  <span className="text-xs font-semibold text-[#B39237]">ID {empleado.id_empleado}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+              Nueva ubicación
+            </label>
+            <select
+              value={nuevaUbicacionId}
+              onChange={(e) => setNuevaUbicacionId(e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:border-[#B39237] focus:ring-2 focus:ring-[#E2BE69]/40"
+            >
+              <option value="">Selecciona una ubicación</option>
+              {ubicaciones
+                .filter((u) => u.id_ubicacion !== ubicacionPendiente?.id_ubicacion)
+                .map((u) => (
+                  <option key={u.id_ubicacion} value={u.id_ubicacion}>
+                    {u.nombre}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

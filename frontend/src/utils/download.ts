@@ -1,9 +1,11 @@
-export async function downloadCsv(url: string, params: Record<string, any> = {}) {
+import { getToken } from './tokenStorage';
+
+export async function downloadFile(url: string, params: Record<string, any> = {}, fallbackName = 'reporte.dat') {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') query.append(k, String(v));
   });
-  const token = localStorage.getItem('token');
+  const token = getToken();
   const fullUrl = query.toString() ? `${url}?${query.toString()}` : url;
   const res = await fetch(fullUrl, {
     headers: {
@@ -16,7 +18,6 @@ export async function downloadCsv(url: string, params: Record<string, any> = {})
   }
   const blob = await res.blob();
   const cd = res.headers.get('Content-Disposition');
-  const fallbackName = 'export.csv';
   const filename = cd && /filename="?([^";]+)"?/i.exec(cd)?.[1] ? RegExp.$1 : fallbackName;
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);

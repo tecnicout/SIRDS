@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getToken, clearToken } from '../utils/tokenStorage';
 
 const api = axios.create({
   baseURL: '/api',
@@ -10,7 +11,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = getToken();
   if (token) {
     config.headers = config.headers || {};
     (config.headers as any).Authorization = `Bearer ${token}`;
@@ -23,7 +24,7 @@ api.interceptors.response.use(
   (error) => {
     const message = error?.response?.data?.message || error.message || 'Error de red';
     if (error?.response?.status === 401) {
-      try { localStorage.removeItem('token'); } catch {}
+      clearToken();
     }
     return Promise.reject(new Error(message));
   }

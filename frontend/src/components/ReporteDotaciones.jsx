@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getToken } from '../utils/tokenStorage';
 
 const ReporteDotaciones = () => {
   const [reporteData, setReporteData] = useState({
@@ -20,10 +21,9 @@ const ReporteDotaciones = () => {
       if (filtros.fecha_inicio) params.append('fecha_inicio', filtros.fecha_inicio);
       if (filtros.fecha_fin) params.append('fecha_fin', filtros.fecha_fin);
 
-  const response = await fetch(`http://localhost:3001/api/dotaciones/reportes?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const token = getToken();
+      const response = await fetch(`http://localhost:3001/api/dotaciones/reportes?${params.toString()}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       const result = await response.json();
       

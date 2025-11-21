@@ -1,71 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import DataTable from '../components/DataTable/DataTable';
 import Modal from '../components/Modal/Modal';
 import EditModal from '../components/Modal/EditModal';
-import ConfirmModal from '../components/Modal/ConfirmModal';
 import ResourceHeader from '../components/UI/ResourceHeader';
 import CardPanel from '../components/UI/CardPanel';
+import { getToken } from '../utils/tokenStorage';
 
-// Configuración de columnas para la tabla de proveedores
-const PROVEEDORES_COLUMNS = [
-  {
-    key: 'id_proveedor',
-    label: 'ID',
-    sortable: true,
-    width: '80px'
-  },
-  {
-    key: 'nombre',
-    label: 'Nombre',
-    sortable: true,
-    render: (value, row) => (
-      <div className="font-medium text-gray-900">
-        {value}
-        {!Boolean(row.activo) && (
-          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-            Inactivo
-          </span>
-        )}
-      </div>
-    )
-  },
-  {
-    key: 'telefono',
-    label: 'Teléfono',
-    sortable: false,
-    render: (value) => value || <span className="text-gray-400">No especificado</span>
-  },
-  {
-    key: 'email',
-    label: 'Email',
-    sortable: true,
-    render: (value) => value || <span className="text-gray-400">No especificado</span>
-  },
-  {
-    key: 'direccion',
-    label: 'Dirección',
-    sortable: false,
-    render: (value) => (
-      <div className="max-w-xs truncate" title={value}>
-        {value || <span className="text-gray-400">No especificada</span>}
-      </div>
-    )
-  },
-  {
-    key: 'activo',
-    label: 'Estado',
-    sortable: true,
-    width: '100px',
-    render: (value) => (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        Boolean(value)
-          ? 'bg-green-100 text-green-800' 
-          : 'bg-red-100 text-red-800'
-      }`}>
-        {Boolean(value) ? 'Activo' : 'Inactivo'}
-      </span>
-    )
-  }
+const ESTADO_FILTERS = [
+  { key: 'all', label: 'Todos' },
+  { key: 'active', label: 'Activos' },
+  { key: 'inactive', label: 'Inactivos' }
 ];
 
 // Campos de vista detallada
@@ -175,6 +118,8 @@ export default function Proveedores() {
 
   // Estado para mostrar proveedores inactivos
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState('all');
 
   // Toast notification system
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -193,7 +138,7 @@ export default function Proveedores() {
       setIsLoading(true);
       setError(null);
       
-      const token = localStorage.getItem('token');
+      const token = getToken();
       if (!token) {
         throw new Error('No hay token de autenticación');
       }
@@ -251,7 +196,7 @@ export default function Proveedores() {
   const crearProveedor = useCallback(async (proveedorData) => {
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch('/api/proveedores', {
         method: 'POST',
@@ -283,7 +228,7 @@ export default function Proveedores() {
   const actualizarProveedor = useCallback(async (proveedorData) => {
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch(`/api/proveedores/${editingProveedor.id_proveedor}`, {
         method: 'PUT',
@@ -325,7 +270,7 @@ export default function Proveedores() {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       console.log('Token obtenido:', token ? 'Presente' : 'No encontrado');
       
       const response = await fetch(`/api/proveedores/${id}/${accion}`, {
@@ -385,6 +330,36 @@ export default function Proveedores() {
     }
   };
 
+  const proveedoresFiltrados = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase();
+    return proveedores.filter((proveedor) => {
+      const activo = Boolean(proveedor.activo);
+      const matchesEstado =
+        estadoFiltro === 'all' ||
+        (estadoFiltro === 'active' && activo) ||
+        (estadoFiltro === 'inactive' && !activo);
+
+      if (!matchesEstado) {
+        return false;
+      }
+
+      if (!term) {
+        return true;
+      }
+
+      const valuesToSearch = [
+        proveedor.nombre,
+        proveedor.email,
+        proveedor.telefono,
+        proveedor.direccion
+      ];
+
+      return valuesToSearch.some((value) =>
+        value?.toString().toLowerCase().includes(term)
+      );
+    });
+  }, [proveedores, searchQuery, estadoFiltro]);
+
   if (error) {
     return (
       <div className="p-6">
@@ -443,28 +418,166 @@ export default function Proveedores() {
       />
 
       <CardPanel title="Listado de Proveedores" icon="bx-spreadsheet" actions={null}>
-        {!isLoading && (
-          <div className="px-2 pb-3 text-sm text-[#7A6B46]">
-            {proveedores.length} proveedor{proveedores.length !== 1 ? 'es' : ''} {mostrarInactivos ? '(incluye inactivos)' : 'activos'}
-          </div>
-        )}
-        <DataTable
-          columns={PROVEEDORES_COLUMNS}
-          data={proveedores}
-          loading={isLoading}
-          onRowAction={handleRowAction}
-          rowActions={['view', 'edit', 'toggle']}
-          rowKey="id_proveedor"
-          searchPlaceholder="Buscar por nombre, email, teléfono o dirección..."
-          emptyState={
-            <div className="p-8 text-center text-gray-500">
-              {mostrarInactivos 
-                ? 'No hay proveedores registrados. ¡Crea el primer proveedor!'
-                : 'No hay proveedores activos. Activa el toggle "Mostrar inactivos" para ver todos.'
-              }
+        <div className="space-y-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex-1">
+              <div className="relative">
+                <i className="bx bx-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por nombre, teléfono, email o dirección"
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-10 py-2.5 text-sm text-gray-700 focus:border-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#E2BE69]/40"
+                />
+              </div>
             </div>
-          }
-        />
+            <div className="flex flex-wrap gap-2">
+              {ESTADO_FILTERS.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setEstadoFiltro(filter.key)}
+                  className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
+                    estadoFiltro === filter.key
+                      ? 'border-[#E2BE69] bg-[#FFF8E7] text-[#6F581B]'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-[#E2BE69]/60'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-100 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-3 text-xs text-gray-500">
+              <span>{proveedoresFiltrados.length} proveedor{proveedoresFiltrados.length !== 1 ? 'es' : ''} encontrados</span>
+              <span className="hidden sm:inline text-[#7A6B46]">{mostrarInactivos ? 'Incluyendo inactivos' : 'Sólo activos'}</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-100 text-sm">
+                <thead className="bg-[#F9F4E7] text-[#6F581B]">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide">ID</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide">Proveedor</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide">Contacto</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide">Email</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide">Dirección</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide">Estado</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {isLoading && (
+                    [...Array(5)].map((_, index) => (
+                      <tr key={`skeleton-${index}`} className="animate-pulse">
+                        {[...Array(7)].map((__, cellIndex) => (
+                          <td key={cellIndex} className="px-6 py-4">
+                            <div className="h-3 rounded-full bg-gray-200"></div>
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+
+                  {!isLoading && proveedoresFiltrados.map((proveedor) => {
+                    const activo = Boolean(proveedor.activo);
+                    return (
+                      <tr key={proveedor.id_proveedor} className="hover:bg-gray-50">
+                        <td className="whitespace-nowrap px-6 py-4 text-xs font-semibold text-gray-500">#{proveedor.id_proveedor}</td>
+                        <td className="max-w-xs px-6 py-4">
+                          <div className="font-semibold text-gray-900">{proveedor.nombre}</div>
+                          {!activo && (
+                            <span className="mt-1 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[0.65rem] font-semibold text-red-600">
+                              Inactivo
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {proveedor.telefono || <span className="text-gray-400">No especificado</span>}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {proveedor.email || <span className="text-gray-400">No especificado</span>}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {proveedor.direccion ? (
+                            <span
+                              title={proveedor.direccion}
+                              className="block max-w-xs truncate"
+                            >
+                              {proveedor.direccion}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">No especificada</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                            activo ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                          }`}>
+                            {activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleRowAction('view', proveedor)}
+                              className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1.5 text-gray-700 hover:border-[#B39237]"
+                            >
+                              <i className="bx bx-show"></i>
+                              Ver
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRowAction('edit', proveedor)}
+                              className="inline-flex items-center gap-1 rounded-full border border-[#D4AF37] bg-[#FFF8E7] px-3 py-1.5 text-[#6F581B] hover:bg-[#F9EDCC]"
+                            >
+                              <i className="bx bx-edit"></i>
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRowAction('toggle', proveedor)}
+                              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 ${
+                                activo
+                                  ? 'border-red-100 text-red-600 hover:bg-red-50'
+                                  : 'border-emerald-100 text-emerald-700 hover:bg-emerald-50'
+                              }`}
+                            >
+                              <i className={`bx ${activo ? 'bx-lock' : 'bx-lock-open-alt'}`}></i>
+                              {activo ? 'Inactivar' : 'Activar'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {!isLoading && proveedoresFiltrados.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
+                        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F9F4E7] text-[#B39237]">
+                          <i className="bx bx-store text-2xl"></i>
+                        </div>
+                        <p className="font-semibold text-gray-800">No encontramos proveedores con los filtros actuales.</p>
+                        <p className="mt-1 text-sm text-gray-500">Ajusta la búsqueda o registra un nuevo proveedor.</p>
+                        <button
+                          onClick={() => setShowCreateModal(true)}
+                          className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#B39237] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[#9C7F2F]"
+                        >
+                          <i className="bx bx-plus"></i>
+                          Crear proveedor
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </CardPanel>
 
       {/* Modal para crear proveedor */}

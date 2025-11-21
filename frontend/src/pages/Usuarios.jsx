@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import DataTable from '../components/DataTable/DataTable';
 import { ViewModal, EditModal } from '../components/Modal';
 import ResourceHeader from '../components/UI/ResourceHeader';
 import CardPanel from '../components/UI/CardPanel';
+import useStoredUser from '../hooks/useStoredUser';
+import { getToken } from '../utils/tokenStorage';
 
 // Configuración de columnas para la tabla de usuarios
-const USUARIOS_COLUMNS = [
+const buildUsuarioColumns = (currentUser) => [
   {
     key: 'username',
     label: 'Usuario',
@@ -13,11 +15,21 @@ const USUARIOS_COLUMNS = [
     sortable: true,
     render: (value, row) => (
       <div className="flex items-center">
-        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-          <span className="text-green-600 font-medium text-sm flex items-center gap-1">
-            <i className="bx bx-user"></i>
-            {value?.charAt(0)?.toUpperCase() || 'U'}
-          </span>
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center border border-gray-200 shadow-sm overflow-hidden"
+          style={!((row.avatar_url || (currentUser && row.id_usuario === currentUser.id_usuario && currentUser.avatar_url))) ? { backgroundColor: row.avatar_color || (currentUser && row.id_usuario === currentUser.id_usuario ? currentUser.avatar_color : '#C8F7DC') } : undefined}
+        >
+          {(() => {
+            const effectiveAvatar = row.avatar_url || (currentUser && row.id_usuario === currentUser.id_usuario ? currentUser.avatar_url : null);
+            if (effectiveAvatar) {
+              return <img src={effectiveAvatar} alt={value} className="w-full h-full object-cover" />;
+            }
+            return (
+              <span className="text-green-600 font-medium text-sm">
+                {value?.charAt(0)?.toUpperCase() || 'U'}
+              </span>
+            );
+          })()}
         </div>
         <div className="ml-4">
           <div className="text-sm font-medium text-gray-900">
@@ -261,6 +273,7 @@ const USUARIO_VALIDATION_RULES = {
 };
 
 export default function Usuarios() {
+  const [currentUser] = useStoredUser();
   const [usuarios, setUsuarios] = useState([]);
   const [empleadosSinUsuario, setEmpleadosSinUsuario] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -281,6 +294,7 @@ export default function Usuarios() {
 
   // Toast notification system
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const usuarioColumns = useMemo(() => buildUsuarioColumns(currentUser), [currentUser]);
 
   // Show toast function
   const showToast = (message, type = 'success') => {
@@ -293,7 +307,7 @@ export default function Usuarios() {
   // Fix: Usar useCallback para evitar bucle infinito en useEffect
   const cargarUsuarios = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch('/api/usuarios', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -317,7 +331,7 @@ export default function Usuarios() {
   // Fix: Usar useCallback para cargarEmpleadosSinUsuario
   const cargarEmpleadosSinUsuario = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch('/api/usuarios/employees-without-user', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -337,7 +351,7 @@ export default function Usuarios() {
   // Fix: Usar useCallback para cargarEstadisticas
   const cargarEstadisticas = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch('/api/usuarios/stats', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -375,6 +389,21 @@ export default function Usuarios() {
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
+
+  useEffect(() => {
+    if (!currentUser?.id_usuario) {
+      return;
+    }
+    setUsuarios((prev) => prev.map((usuario) => (
+      usuario.id_usuario === currentUser.id_usuario
+        ? {
+            ...usuario,
+            avatar_url: currentUser.avatar_url ?? usuario.avatar_url,
+            avatar_color: currentUser.avatar_color ?? usuario.avatar_color
+          }
+        : usuario
+    )));
+  }, [currentUser?.id_usuario, currentUser?.avatar_url, currentUser?.avatar_color]);
 
   // Filtrar usuarios
   const usuariosFiltrados = usuarios.filter(usuario => {
@@ -432,7 +461,7 @@ export default function Usuarios() {
     const previo = usuario.usuario_activo;
     setUsuarios(prev => prev.map(u => u.id_usuario === usuario.id_usuario ? { ...u, usuario_activo: !previo } : u));
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const endpoint = previo 
         ? `/api/usuarios/${usuario.id_usuario}/deactivate`
         : `/api/usuarios/${usuario.id_usuario}/activate`;
@@ -480,7 +509,7 @@ export default function Usuarios() {
 
     setProcessingRowId(usuario.id_usuario);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch(`/api/usuarios/${usuario.id_usuario}/reset-password`, {
         method: 'PATCH',
         headers: {
@@ -515,7 +544,7 @@ export default function Usuarios() {
       if (!confirmDeactivate) return;
       try {
         setProcessingRowId(usuario.id_usuario);
-        const token = localStorage.getItem('token');
+        const token = getToken();
         // 1) Desactivar
         const deact = await fetch(`/api/usuarios/${usuario.id_usuario}/deactivate`, {
           method: 'PATCH',
@@ -553,7 +582,7 @@ export default function Usuarios() {
 
     try {
       setProcessingRowId(usuario.id_usuario);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch(`/api/usuarios/${usuario.id_usuario}`, {
         method: 'DELETE',
         headers: {
@@ -580,7 +609,7 @@ export default function Usuarios() {
   const handleEditSubmit = async (formData) => {
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch(`/api/usuarios/${editingUser.id_usuario}`, {
         method: 'PUT',
@@ -614,7 +643,7 @@ export default function Usuarios() {
   const handleCreateSubmit = async (formData) => {
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch('/api/usuarios', {
         method: 'POST',
@@ -741,7 +770,7 @@ export default function Usuarios() {
 
       <CardPanel title="Usuarios" icon="bx-id-card">
         <DataTable
-          columns={USUARIOS_COLUMNS}
+          columns={usuarioColumns}
           data={usuariosFiltrados}
           rowKey="id_usuario"
           loading={isLoading}

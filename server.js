@@ -72,6 +72,11 @@ const ciclosRoutes = require('./backend/routes/ciclosRoutes');
 const entregasCicloRoutes = require('./backend/routes/entregasRoutes');
 const reportesRoutes = require('./backend/routes/reportesRoutes');
 const publicRoutes = require('./backend/routes/publicRoutes');
+const accountRoutes = require('./backend/routes/accountRoutes');
+const dashboardRoutes = require('./backend/routes/dashboardRoutes');
+
+const uploadsDir = path.join(__dirname, 'backend', 'uploads');
+app.use('/uploads', express.static(uploadsDir));
 
 // Rutas API
 app.use('/api/public', publicRoutes);
@@ -96,6 +101,8 @@ app.use('/api/entregas', entregaRoutes);
 app.use('/api/ciclos', ciclosRoutes);
 app.use('/api/entregas-ciclo', entregasCicloRoutes);
 app.use('/api/reportes', reportesRoutes);
+app.use('/api/account', accountRoutes);
+app.use('/api/admin/dashboard', dashboardRoutes);
 
 // Manejo de errores global
 app.use((err, req, res, next) => {

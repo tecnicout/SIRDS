@@ -132,13 +132,13 @@ const Modal = ({
       {/* Modal con diseño mejorado */}
       <div 
         ref={modalRef}
-        className={`relative bg-white/95 backdrop-blur-lg rounded-lg md:rounded-2xl shadow-2xl w-full ${sizeClasses[size]} max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200/50 ${className}`}
+        className={`relative flex flex-col bg-white/95 backdrop-blur-lg rounded-lg md:rounded-2xl shadow-2xl w-full ${sizeClasses[size]} max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-[#E2BE69]/40 ${className}`}
       >
         {/* Header mejorado */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 border-b border-gray-200/70 bg-gradient-to-r from-gray-50/80 to-white/80">
+          <div className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 border-b border-[#E2BE69]/60 bg-gradient-to-r from-[#B39237] via-[#D4AF37] to-[#E2BE69] text-white">
             {title && (
-              <h3 id="modal-title" className="text-lg md:text-xl font-semibold text-gray-700 pr-4">
+              <h3 id="modal-title" className="text-lg md:text-xl font-semibold text-white pr-4">
                 {title}
               </h3>
             )}
@@ -146,7 +146,7 @@ const Modal = ({
               <button
                 ref={closeButtonRef}
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl p-2 transition-all duration-200"
+                className="text-white/90 hover:text-white hover:bg-white/10 rounded-xl p-2 transition-all duration-200"
                 aria-label="Cerrar modal"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,13 +158,13 @@ const Modal = ({
         )}
         
         {/* Contenido con scroll mejorado */}
-        <div className={`px-4 md:px-8 py-4 md:py-6 overflow-y-auto max-h-[calc(95vh-8rem)] md:max-h-[calc(90vh-8rem)] ${contentClassName}`}>
+        <div className={`flex-1 min-h-0 px-4 md:px-8 py-4 md:py-6 overflow-y-auto ${contentClassName}`}>
           {children}
         </div>
         
         {/* Footer mejorado */}
         {footer && (
-          <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-3 px-4 md:px-8 py-4 md:py-6 border-t border-gray-200/70 bg-gradient-to-r from-gray-50/50 to-white/80">
+          <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-3 px-4 md:px-8 py-4 md:py-6 border-t border-[#E2BE69]/60 bg-gradient-to-r from-[#FFF4DA]/90 to-white/80">
             {footer}
           </div>
         )}

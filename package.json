@@ -27,6 +27,7 @@
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "pdfkit": "^0.15.0",
     "morgan": "^1.10.0",
     "motion": "^12.23.24",
     "mysql2": "^3.6.3",

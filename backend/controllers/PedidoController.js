@@ -9,6 +9,8 @@ const buildError = (code, message, meta = {}) => {
   return err;
 };
 
+const createPlaceholders = (arr = []) => arr.map(() => '?').join(',');
+
 const formatSqlDate = (date = new Date()) => new Date(date).toISOString().slice(0, 10);
 
 let sinTallaCacheId = null;
@@ -28,6 +30,94 @@ const ensureSinTallaId = async (connection) => {
   );
   sinTallaCacheId = insert.insertId;
   return sinTallaCacheId;
+};
+
+const recepcionTableSql = `
+  CREATE TABLE IF NOT EXISTS RecepcionPedido (
+    id_recepcion INT AUTO_INCREMENT PRIMARY KEY,
+    id_pedido INT NOT NULL,
+    id_proveedor INT NULL,
+    proveedor_nombre VARCHAR(150) NULL,
+    documento_referencia VARCHAR(120) NULL,
+    fecha_recepcion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    observaciones TEXT NULL,
+    usuario_registro VARCHAR(100) NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_recepcion_pedido FOREIGN KEY (id_pedido) REFERENCES PedidoCompras(id_pedido) ON DELETE CASCADE,
+    CONSTRAINT fk_recepcion_proveedor FOREIGN KEY (id_proveedor) REFERENCES Proveedor(id_proveedor) ON DELETE SET NULL,
+    INDEX idx_recepcion_id_pedido (id_pedido)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+`;
+
+const detalleRecepcionTableSql = `
+  CREATE TABLE IF NOT EXISTS DetalleRecepcionPedido (
+    id_recepcion_detalle INT AUTO_INCREMENT PRIMARY KEY,
+    id_recepcion INT NOT NULL,
+    id_detalle_pedido INT NOT NULL,
+    id_dotacion INT NOT NULL,
+    id_talla INT NULL,
+    cantidad_recibida INT NOT NULL,
+    precio_unitario DECIMAL(12,2) NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_detalle_recepcion FOREIGN KEY (id_recepcion) REFERENCES RecepcionPedido(id_recepcion) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_recepcion_pedido FOREIGN KEY (id_detalle_pedido) REFERENCES DetallePedidoCompras(id_detalle) ON DELETE CASCADE,
+    CONSTRAINT fk_detalle_recepcion_dotacion FOREIGN KEY (id_dotacion) REFERENCES Dotacion(id_dotacion) ON DELETE RESTRICT,
+    CONSTRAINT fk_detalle_recepcion_talla FOREIGN KEY (id_talla) REFERENCES Talla(id_talla) ON DELETE SET NULL,
+    INDEX idx_detalle_recepcion_pedido_detalle (id_detalle_pedido)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+`;
+
+let recepcionTablesReady = false;
+let recepcionInitPromise = null;
+
+const ensureRecepcionTables = async () => {
+  if (recepcionTablesReady) return true;
+  if (recepcionInitPromise) {
+    await recepcionInitPromise;
+    return true;
+  }
+  recepcionInitPromise = (async () => {
+    await query(recepcionTableSql);
+    await query(detalleRecepcionTableSql);
+    recepcionTablesReady = true;
+  })().catch((error) => {
+    recepcionInitPromise = null;
+    console.error('[PedidoController] No fue posible crear tablas de recepción:', error.message);
+    throw error;
+  });
+  await recepcionInitPromise;
+  return true;
+};
+
+const DEFAULT_STOCK_AREA_ID = Number(process.env.DEFAULT_STOCK_AREA_ID || 7);
+const DEFAULT_STOCK_UBICACION_ID = Number(process.env.DEFAULT_STOCK_UBICACION_ID || 3);
+const stockLocationCache = new Map();
+
+const resolveStockLocation = async (connection, idDotacion) => {
+  if (stockLocationCache.has(idDotacion)) {
+    return stockLocationCache.get(idDotacion);
+  }
+
+  const [existing] = await connection.query(
+    'SELECT id_area, id_ubicacion FROM stockdotacion WHERE id_dotacion = ? LIMIT 1',
+    [idDotacion]
+  );
+  if (existing.length) {
+    stockLocationCache.set(idDotacion, existing[0]);
+    return existing[0];
+  }
+
+  if (DEFAULT_STOCK_AREA_ID == null || DEFAULT_STOCK_UBICACION_ID == null) {
+    throw buildError('STOCK_LOCATION_REQUIRED', 'No existe un área/ubicación predeterminada para almacenar la recepción.');
+  }
+
+  const fallback = {
+    id_area: DEFAULT_STOCK_AREA_ID,
+    id_ubicacion: DEFAULT_STOCK_UBICACION_ID
+  };
+  stockLocationCache.set(idDotacion, fallback);
+  return fallback;
 };
 
 class PedidoController {
@@ -340,6 +430,523 @@ class PedidoController {
       if (connection) {
         connection.release();
       }
+    }
+  }
+
+  static async remove(req, res) {
+    const idPedido = Number(req.params.id);
+    if (!idPedido) {
+      return res.status(400).json({ success: false, message: 'Identificador de pedido inválido.' });
+    }
+
+    let connection;
+    try {
+      connection = await getConnection();
+      await connection.beginTransaction();
+
+      const [rows] = await connection.query(
+        'SELECT id_pedido, estado FROM PedidoCompras WHERE id_pedido = ? LIMIT 1',
+        [idPedido]
+      );
+
+        if (stockRows.length) {
+          await connection.query(
+            'UPDATE stockdotacion SET cantidad = cantidad + ?, fecha_actualizacion = NOW() WHERE id_stock = ?',
+            [item.cantidad, stockRows[0].id_stock]
+          );
+        } else {
+          const stockLocation = await resolveStockLocation(connection, item.id_dotacion);
+          await connection.query(
+            `INSERT INTO stockdotacion (id_dotacion, id_talla, id_area, id_ubicacion, cantidad)
+             VALUES (?, ?, ?, ?, ?)` ,
+            [
+              item.id_dotacion,
+              item.id_talla,
+              stockLocation.id_area,
+              stockLocation.id_ubicacion,
+              item.cantidad
+            ]
+          );
+        }
+    } catch (error) {
+      if (connection) {
+        try {
+          await connection.rollback();
+        } catch (_) { /* noop */ }
+      }
+      console.error('[PedidoController.remove] Error:', error);
+      return res.status(500).json({ success: false, message: 'Error al eliminar el pedido', error: error.message });
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+
+  static async registrarRecepcion(req, res) {
+    const idPedido = Number(req.params.id);
+    if (!idPedido) {
+      return res.status(400).json({ success: false, message: 'Identificador de pedido inválido' });
+    }
+
+    try {
+      await ensureRecepcionTables();
+    } catch (err) {
+      console.error('[PedidoController.registrarRecepcion] Error creando tablas:', err.message);
+      return res.status(500).json({ success: false, message: 'No fue posible preparar las tablas de recepción', error: err.message });
+    }
+
+    const {
+      proveedorId,
+      proveedorNombre,
+      documentoReferencia,
+      fechaRecepcion,
+      observaciones,
+      items
+    } = req.body || {};
+
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ success: false, message: 'Debe enviar al menos una línea a recibir' });
+    }
+
+    const connection = await getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [pedidoRows] = await connection.query(
+        'SELECT id_pedido, estado FROM PedidoCompras WHERE id_pedido = ? FOR UPDATE',
+        [idPedido]
+      );
+
+      if (!pedidoRows.length) {
+        await connection.rollback();
+        return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
+      }
+
+      const pedido = pedidoRows[0];
+      if (!['enviado', 'recibido_parcial'].includes(pedido.estado)) {
+        await connection.rollback();
+        return res.status(409).json({
+          success: false,
+          message: 'Solo se pueden registrar recepciones para pedidos enviados o parcialmente recibidos'
+        });
+      }
+
+      const detalleRequests = [];
+      const dotacionRequests = [];
+      for (const item of items) {
+        const idDetalle = Number(item.id_detalle_pedido || item.detalleId);
+        const idDotacion = Number(item.id_dotacion || item.dotacionId);
+        if (idDetalle) {
+          detalleRequests.push({ ...item, id_detalle: idDetalle });
+        } else if (idDotacion) {
+          dotacionRequests.push({ ...item, id_dotacion: idDotacion });
+        } else {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: 'Cada línea debe indicar id_detalle_pedido o id_dotacion' });
+        }
+      }
+
+      if (!detalleRequests.length && !dotacionRequests.length) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: 'Debe enviar al menos una línea válida' });
+      }
+
+      const detalleMap = new Map();
+
+      if (detalleRequests.length) {
+        const detalleIds = detalleRequests.map((item) => item.id_detalle);
+        const placeholders = createPlaceholders(detalleIds);
+        const [detalleRows] = await connection.query(
+          `SELECT dp.id_detalle, dp.id_dotacion, dp.id_talla, dp.cantidad_solicitada, dp.cantidad_recibida,
+            dp.precio_unitario,
+            (dp.cantidad_solicitada - dp.cantidad_recibida) AS pendiente,
+                  d.nombre_dotacion
+           FROM DetallePedidoCompras dp
+           INNER JOIN dotacion d ON d.id_dotacion = dp.id_dotacion
+           WHERE dp.id_pedido = ? AND dp.id_detalle IN (${placeholders})
+           FOR UPDATE`,
+          [idPedido, ...detalleIds]
+        );
+
+        if (detalleRows.length !== detalleIds.length) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: 'Una o más líneas no pertenecen al pedido' });
+        }
+
+        detalleRows.forEach((row) => detalleMap.set(row.id_detalle, row));
+      }
+
+      let dotacionDetalleMap = new Map();
+      if (dotacionRequests.length) {
+        const dotacionIds = Array.from(new Set(dotacionRequests.map((item) => item.id_dotacion)));
+        const placeholdersDot = createPlaceholders(dotacionIds);
+        const [dotacionRows] = await connection.query(
+          `SELECT dp.id_detalle, dp.id_dotacion, dp.id_talla, dp.cantidad_solicitada, dp.cantidad_recibida,
+                  dp.precio_unitario,
+                  (dp.cantidad_solicitada - dp.cantidad_recibida) AS pendiente,
+                  d.nombre_dotacion
+             FROM DetallePedidoCompras dp
+             INNER JOIN dotacion d ON d.id_dotacion = dp.id_dotacion
+             WHERE dp.id_pedido = ? AND dp.id_dotacion IN (${placeholdersDot})
+             ORDER BY dp.id_dotacion, dp.id_detalle
+             FOR UPDATE`,
+          [idPedido, ...dotacionIds]
+        );
+
+        dotacionDetalleMap = dotacionRows.reduce((acc, row) => {
+          if (!acc.has(row.id_dotacion)) {
+            acc.set(row.id_dotacion, []);
+          }
+          const sharedRow = detalleMap.get(row.id_detalle) || row;
+          if (!detalleMap.has(row.id_detalle)) {
+            detalleMap.set(row.id_detalle, sharedRow);
+          }
+          acc.get(row.id_dotacion).push(sharedRow);
+          return acc;
+        }, new Map());
+
+        for (const dotacionId of dotacionIds) {
+          if (!dotacionDetalleMap.has(dotacionId)) {
+            await connection.rollback();
+            return res.status(400).json({
+              success: false,
+              message: 'El pedido no contiene líneas pendientes para la dotación solicitada'
+            });
+          }
+        }
+      }
+
+      const preparedItems = [];
+
+      for (const item of detalleRequests) {
+        const cantidad = Number(item.cantidad);
+        const detalle = detalleMap.get(item.id_detalle);
+        if (!detalle) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: 'Detalle inválido en la solicitud' });
+        }
+        if (!cantidad || cantidad <= 0) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: 'La cantidad debe ser mayor a cero' });
+        }
+
+        preparedItems.push({
+          id_detalle: detalle.id_detalle,
+          cantidad,
+          id_dotacion: detalle.id_dotacion,
+          id_talla: detalle.id_talla,
+          precio_unitario: detalle.precio_unitario || null
+        });
+        detalle.pendiente = Math.max((Number(detalle.pendiente) || 0) - cantidad, 0);
+      }
+
+      for (const item of dotacionRequests) {
+        const cantidadSolicitada = Number(item.cantidad || item.cantidad_total);
+        const lineasDotacion = dotacionDetalleMap.get(item.id_dotacion) || [];
+        if (!cantidadSolicitada || cantidadSolicitada <= 0) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: 'La cantidad debe ser mayor a cero' });
+        }
+        if (!lineasDotacion.length) {
+          await connection.rollback();
+          return res.status(400).json({
+            success: false,
+            message: 'No hay líneas disponibles para distribuir la recepción agrupada'
+          });
+        }
+
+        const pendienteTotal = lineasDotacion.reduce((sum, linea) => sum + Math.max(Number(linea.pendiente) || 0, 0), 0);
+        if (!pendienteTotal) {
+          await connection.rollback();
+          return res.status(409).json({
+            success: false,
+            message: `La dotación ${lineasDotacion[0].nombre_dotacion} ya no tiene cantidades pendientes`
+          });
+        }
+
+        let restante = cantidadSolicitada;
+        for (const linea of lineasDotacion) {
+          const pendiente = Math.max(Number(linea.pendiente) || 0, 0);
+          if (!pendiente || restante <= 0) {
+            continue;
+          }
+          const asignar = Math.min(pendiente, restante);
+          preparedItems.push({
+            id_detalle: linea.id_detalle,
+            cantidad: asignar,
+            id_dotacion: linea.id_dotacion,
+            id_talla: linea.id_talla,
+            precio_unitario: linea.precio_unitario || null
+          });
+          linea.pendiente = Math.max(pendiente - asignar, 0);
+          restante -= asignar;
+          if (restante <= 0) {
+            break;
+          }
+        }
+
+        if (restante > 0) {
+          const fallbackLinea = lineasDotacion[0];
+          if (!fallbackLinea) {
+            await connection.rollback();
+            return res.status(500).json({
+              success: false,
+              message: 'No fue posible resolver la línea para completar la recepción agrupada'
+            });
+          }
+          preparedItems.push({
+            id_detalle: fallbackLinea.id_detalle,
+            cantidad: restante,
+            id_dotacion: fallbackLinea.id_dotacion,
+            id_talla: fallbackLinea.id_talla,
+            precio_unitario: fallbackLinea.precio_unitario || null
+          });
+          restante = 0;
+        }
+      }
+
+      const recepcionFecha = fechaRecepcion ? new Date(fechaRecepcion) : new Date();
+      const usuarioRegistro = (req.user && req.user.username) || 'sistema';
+
+      const [recepcionInsert] = await connection.query(
+        `INSERT INTO RecepcionPedido
+          (id_pedido, id_proveedor, proveedor_nombre, documento_referencia, fecha_recepcion, observaciones, usuario_registro)
+         VALUES (?, ?, ?, ?, ?, ?, ?)` ,
+        [
+          idPedido,
+          proveedorId || null,
+          proveedorNombre || null,
+          documentoReferencia || null,
+          recepcionFecha,
+          observaciones || null,
+          usuarioRegistro
+        ]
+      );
+      const idRecepcion = recepcionInsert.insertId;
+
+      for (const item of preparedItems) {
+        await connection.query(
+          `INSERT INTO DetalleRecepcionPedido
+            (id_recepcion, id_detalle_pedido, id_dotacion, id_talla, cantidad_recibida, precio_unitario)
+           VALUES (?, ?, ?, ?, ?, ?)` ,
+          [
+            idRecepcion,
+            item.id_detalle,
+            item.id_dotacion,
+            item.id_talla,
+            item.cantidad,
+            item.precio_unitario
+          ]
+        );
+
+        await connection.query(
+          'UPDATE DetallePedidoCompras SET cantidad_recibida = cantidad_recibida + ? WHERE id_detalle = ?',
+          [item.cantidad, item.id_detalle]
+        );
+
+        const [stockRows] = await connection.query(
+          'SELECT id_stock FROM stockdotacion WHERE id_dotacion = ? AND id_talla = ? LIMIT 1',
+          [item.id_dotacion, item.id_talla]
+        );
+
+        if (stockRows.length) {
+          await connection.query(
+            'UPDATE stockdotacion SET cantidad = cantidad + ?, fecha_actualizacion = NOW() WHERE id_stock = ?',
+            [item.cantidad, stockRows[0].id_stock]
+          );
+        } else {
+          const stockLocation = await resolveStockLocation(connection, item.id_dotacion);
+          await connection.query(
+            `INSERT INTO stockdotacion (id_dotacion, id_talla, id_area, id_ubicacion, cantidad)
+             VALUES (?, ?, ?, ?, ?)` ,
+            [
+              item.id_dotacion,
+              item.id_talla,
+              stockLocation.id_area,
+              stockLocation.id_ubicacion,
+              item.cantidad
+            ]
+          );
+        }
+      }
+
+      const [pendientesRows] = await connection.query(
+        `SELECT SUM(cantidad_solicitada - cantidad_recibida) AS pendientes
+         FROM DetallePedidoCompras
+         WHERE id_pedido = ?`,
+        [idPedido]
+      );
+
+      const pendientes = Number(pendientesRows[0]?.pendientes || 0);
+      const nuevoEstado = pendientes > 0 ? 'recibido_parcial' : 'recibido_completo';
+      await connection.query('UPDATE PedidoCompras SET estado = ? WHERE id_pedido = ?', [nuevoEstado, idPedido]);
+
+      await connection.query(
+        `INSERT INTO historialmovimientos (tabla_modificada, id_registro, tipo_movimiento, fecha_movimiento, usuario_responsable, detalle_cambio)
+         VALUES ('PedidoCompras', ?, 'RECEPCION', NOW(), ?, ?)` ,
+        [
+          idPedido,
+          usuarioRegistro,
+          `Recepción registrada (${preparedItems.length} líneas, estado ${nuevoEstado})`
+        ]
+      );
+
+      await connection.commit();
+
+      return res.status(201).json({
+        success: true,
+        message: 'Recepción registrada correctamente',
+        data: {
+          id_recepcion: idRecepcion,
+          estado_pedido: nuevoEstado
+        }
+      });
+    } catch (error) {
+      try { await connection.rollback(); } catch (_) { /* ignore */ }
+      console.error('[PedidoController.registrarRecepcion] Error:', error);
+      const status = error.code === 'STOCK_LOCATION_REQUIRED' ? 409 : 500;
+      const message = error.code === 'STOCK_LOCATION_REQUIRED'
+        ? error.message
+        : 'Error al registrar la recepción';
+      return res.status(status).json({ success: false, message, error: error.message });
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async listRecepciones(req, res) {
+    const idPedido = Number(req.params.id);
+    if (!idPedido) {
+      return res.status(400).json({ success: false, message: 'Identificador de pedido inválido' });
+    }
+
+    try {
+      await ensureRecepcionTables();
+    } catch (err) {
+      console.error('[PedidoController.listRecepciones] Error creando tablas:', err.message);
+      return res.status(500).json({ success: false, message: 'No fue posible preparar las tablas de recepción', error: err.message });
+    }
+
+    try {
+      const pedidoRows = await query(
+        `SELECT p.id_pedido, p.estado, p.fecha, p.total_pedido, cd.nombre_ciclo
+         FROM PedidoCompras p
+         LEFT JOIN ciclo_dotacion cd ON cd.id_ciclo = p.id_ciclo
+         WHERE p.id_pedido = ?
+         LIMIT 1`,
+        [idPedido]
+      );
+
+      if (!pedidoRows.length) {
+        return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
+      }
+
+      const recepciones = await query(
+        `SELECT r.*, pr.nombre AS proveedor_catalogo
+         FROM RecepcionPedido r
+         LEFT JOIN Proveedor pr ON pr.id_proveedor = r.id_proveedor
+         WHERE r.id_pedido = ?
+         ORDER BY r.fecha_recepcion DESC, r.id_recepcion DESC`,
+        [idPedido]
+      );
+
+      let detalles = [];
+      if (recepciones.length) {
+        const ids = recepciones.map((r) => r.id_recepcion);
+        const placeholders = createPlaceholders(ids);
+        detalles = await query(
+          `SELECT drp.*, d.nombre_dotacion, t.talla, t.tipo_articulo
+           FROM DetalleRecepcionPedido drp
+           INNER JOIN dotacion d ON d.id_dotacion = drp.id_dotacion
+           LEFT JOIN talla t ON t.id_talla = drp.id_talla
+           WHERE drp.id_recepcion IN (${placeholders})
+           ORDER BY drp.id_recepcion, d.nombre_dotacion`,
+          ids
+        );
+      }
+
+      const detalleMap = recepciones.reduce((acc, recepcion) => {
+        acc[recepcion.id_recepcion] = [];
+        return acc;
+      }, {});
+      for (const detalle of detalles) {
+        if (!detalleMap[detalle.id_recepcion]) {
+          detalleMap[detalle.id_recepcion] = [];
+        }
+        detalleMap[detalle.id_recepcion].push(detalle);
+      }
+
+      const payload = recepciones.map((recepcion) => ({
+        ...recepcion,
+        proveedor_resumen: recepcion.proveedor_nombre || recepcion.proveedor_catalogo,
+        detalles: detalleMap[recepcion.id_recepcion] || []
+      }));
+
+      const pendientes = await query(
+        `SELECT dp.id_detalle, dp.id_dotacion, dp.id_talla, dp.cantidad_solicitada, dp.cantidad_recibida,
+                (dp.cantidad_solicitada - dp.cantidad_recibida) AS pendiente,
+                d.nombre_dotacion,
+                d.id_proveedor,
+                pr.nombre AS nombre_proveedor,
+                t.talla
+         FROM DetallePedidoCompras dp
+         INNER JOIN dotacion d ON d.id_dotacion = dp.id_dotacion
+         LEFT JOIN proveedor pr ON pr.id_proveedor = d.id_proveedor
+         LEFT JOIN talla t ON t.id_talla = dp.id_talla
+         WHERE dp.id_pedido = ?
+         ORDER BY dp.id_detalle`,
+        [idPedido]
+      );
+
+      const pendientesAgrupadosMap = new Map();
+      for (const linea of pendientes) {
+        const key = linea.id_dotacion;
+        if (!pendientesAgrupadosMap.has(key)) {
+          pendientesAgrupadosMap.set(key, {
+            id_dotacion: linea.id_dotacion,
+            nombre_dotacion: linea.nombre_dotacion,
+            id_proveedor: linea.id_proveedor || null,
+            nombre_proveedor: linea.nombre_proveedor || null,
+            total_solicitado: 0,
+            total_recibido: 0,
+            total_pendiente: 0,
+            tallas: []
+          });
+        }
+        const entry = pendientesAgrupadosMap.get(key);
+        entry.total_solicitado += Number(linea.cantidad_solicitada || 0);
+        entry.total_recibido += Number(linea.cantidad_recibida || 0);
+        entry.total_pendiente += Number(linea.pendiente || 0);
+        entry.tallas.push({
+          id_detalle: linea.id_detalle,
+          talla: linea.talla,
+          solicitado: Number(linea.cantidad_solicitada || 0),
+          recibido: Number(linea.cantidad_recibida || 0),
+          pendiente: Number(linea.pendiente || 0)
+        });
+      }
+
+      const pendientesAgrupados = Array.from(pendientesAgrupadosMap.values()).sort((a, b) => {
+        const proveedorCompare = (a.nombre_proveedor || '').localeCompare(b.nombre_proveedor || '');
+        if (proveedorCompare !== 0) {
+          return proveedorCompare;
+        }
+        return (a.nombre_dotacion || '').localeCompare(b.nombre_dotacion || '');
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          pedido: pedidoRows[0],
+          recepciones: payload,
+          pendientes,
+          pendientesAgrupados
+        }
+      });
+    } catch (error) {
+      console.error('[PedidoController.listRecepciones] Error:', error);
+      return res.status(500).json({ success: false, message: 'Error al obtener recepciones', error: error.message });
     }
   }
 

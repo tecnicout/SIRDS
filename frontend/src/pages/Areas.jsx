@@ -1,66 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import DataTable from '../components/DataTable/DataTable';
 import { ViewModal, EditModal } from '../components/Modal';
 import ResourceHeader from '../components/UI/ResourceHeader';
 import CardPanel from '../components/UI/CardPanel';
+import { getToken } from '../utils/tokenStorage';
 
-// Configuración de columnas para la tabla de áreas
-const AREAS_COLUMNS = [
-  {
-    key: 'nombre_area',
-    label: 'Área',
-    sortable: true,
-    render: (value, row) => (
-      <div className="flex items-center">
-        <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-          <span className="text-purple-600 font-medium text-sm">
-            {value?.charAt(0)?.toUpperCase() || 'A'}
-          </span>
-        </div>
-        <div className="ml-4">
-          <div className="text-sm font-medium text-gray-900">
-            {value}
-          </div>
-          <div className="text-sm text-gray-500">
-            ID: {row.id_area}
-          </div>
-        </div>
-      </div>
-    )
-  },
-  {
-    key: 'ubicacion_info',
-    label: 'Ubicación',
-    sortable: true,
-    render: (value, row) => (
-      <div>
-        <div className="text-sm font-medium text-gray-900">
-          {row.nombre_ubicacion}
-        </div>
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-          row.tipo_ubicacion === 'planta' 
-            ? 'bg-blue-100 text-blue-800' 
-            : 'bg-green-100 text-green-800'
-        }`}>
-          {row.tipo_ubicacion === 'planta' ? '🏭 Planta' : '📦 Bodega'}
-        </span>
-      </div>
-    )
-  },
-  {
-    key: 'estado',
-    label: 'Estado',
-    align: 'center',
-    render: (value, row) => (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        row.estado 
-          ? 'bg-green-100 text-green-800' 
-          : 'bg-red-100 text-red-800'
-      }`}>
-        {row.estado ? 'Activa' : 'Inactiva'}
-      </span>
-    )
-  }
+const LOCATION_FILTERS = [
+  { key: 'all', label: 'Todas' },
+  { key: 'planta', label: 'Plantas' },
+  { key: 'bodega', label: 'Bodegas' }
 ];
 
 // Configuración de campos para el modal de vista
@@ -71,7 +18,7 @@ const AREA_VIEW_FIELDS = [
   { 
     key: 'tipo_ubicacion', 
     label: 'Tipo de Ubicación', 
-    render: (value) => value === 'planta' ? '🏭 Planta' : '📦 Bodega' 
+    render: (value) => (value?.toLowerCase() === 'planta') ? '🏭 Planta' : '📦 Bodega' 
   },
   { 
     key: 'estado', 
@@ -123,6 +70,9 @@ export default function Areas() {
   // Estados para búsqueda y filtros
   const [searchQuery, setSearchQuery] = useState('');
   const [mostrarInactivas, setMostrarInactivas] = useState(false);
+  const [tipoFiltro, setTipoFiltro] = useState('all');
+
+  const isAreaActive = (area) => String(area?.estado ?? '').toLowerCase() === 'activa';
 
   // Toast notification system
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -140,7 +90,7 @@ export default function Areas() {
   const cargarAreas = useCallback(async () => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       // Usar endpoint específico según si se quieren ver inactivas
       const endpoint = mostrarInactivas ? '/api/areas/todas' : '/api/areas';
@@ -170,7 +120,7 @@ export default function Areas() {
   // Fix: También memoizar cargarUbicaciones para mantener consistencia y evitar warnings
   const cargarUbicaciones = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch('/api/ubicaciones', {
         headers: {
@@ -203,7 +153,7 @@ export default function Areas() {
   const handleSubmit = async (formData) => {
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const url = editingArea 
         ? `/api/areas/${editingArea.id_area}`
@@ -251,7 +201,11 @@ export default function Areas() {
         setShowEditModal(true);
         break;
       case 'delete':
-        inactivarArea(area);
+        if (isAreaActive(area)) {
+          inactivarArea(area);
+        } else {
+          reactivarArea(area);
+        }
         break;
       default:
         break;
@@ -265,7 +219,7 @@ export default function Areas() {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       
       const response = await fetch(`/api/areas/${area.id_area}`, {
         method: 'DELETE',
@@ -289,17 +243,52 @@ export default function Areas() {
     }
   };
 
+  const reactivarArea = async (area) => {
+    if (!window.confirm(`¿Deseas reactivar el área "${area.nombre_area}" y volver a mostrarla como disponible?`)) {
+      return;
+    }
+
+    try {
+      const token = getToken();
+
+      const response = await fetch(`/api/areas/${area.id_area}/reactivar`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        await cargarAreas();
+        showToast(result.message, 'success');
+      } else {
+        showToast(result.message || 'Error al reactivar área', 'error');
+      }
+    } catch (error) {
+      console.error('Error al reactivar área:', error);
+      showToast('Error al reactivar área', 'error');
+    }
+  };
+
   const handleNewArea = () => {
     setEditingArea(null);
     setShowEditModal(true);
   };
 
   // Función para filtrar áreas
-  const areasFiltradas = areas.filter(area =>
-    area.nombre_area?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    area.nombre_ubicacion?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    area.tipo_ubicacion?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const areasFiltradas = areas.filter((area) => {
+    const query = searchQuery.toLowerCase();
+    const tipo = area.tipo_ubicacion?.toLowerCase() || '';
+    const matchesSearch =
+      area.nombre_area?.toLowerCase().includes(query) ||
+      area.nombre_ubicacion?.toLowerCase().includes(query) ||
+      tipo.includes(query);
+    const matchesTipo = tipoFiltro === 'all' || tipo === tipoFiltro;
+    return matchesSearch && matchesTipo;
+  });
 
   // Preparar opciones de ubicaciones para el formulario
   const ubicacionesOptions = ubicaciones.map(ubicacion => ({
@@ -337,9 +326,9 @@ export default function Areas() {
         subtitle="Administra las áreas de trabajo del sistema"
         stats={[
           { icon: 'bx-grid-alt', label: 'Total Áreas', value: areas.length },
-          { icon: 'bx-toggle-left', label: 'Activas', value: areas.filter(a => a.estado).length },
-          { icon: 'bx-buildings', label: 'Plantas', value: areas.filter(a => a.tipo_ubicacion === 'planta').length },
-          { icon: 'bx-box', label: 'Bodegas', value: areas.filter(a => a.tipo_ubicacion === 'bodega').length }
+          { icon: 'bx-toggle-left', label: 'Activas', value: areas.filter(isAreaActive).length },
+          { icon: 'bx-buildings', label: 'Plantas', value: areas.filter(a => a.tipo_ubicacion?.toLowerCase() === 'planta').length },
+          { icon: 'bx-box', label: 'Bodegas', value: areas.filter(a => a.tipo_ubicacion?.toLowerCase() === 'bodega').length }
         ]}
         action={(
           <div className="flex items-center gap-4">
@@ -370,62 +359,112 @@ export default function Areas() {
       )}
 
       <CardPanel title="Listado de Áreas" icon="bx-list-ul" actions={null}>
-        <DataTable
-          columns={AREAS_COLUMNS}
-          data={areasFiltradas}
-          rowKey="id_area"
-          loading={isLoading}
-          error={error}
-          searchQuery={searchQuery}
-          onSearch={setSearchQuery}
-          onRowAction={handleRowAction}
-          actions={[
-            {
-              label: 'Ver',
-              action: 'view',
-              icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              ),
-              className: 'text-blue-600 hover:text-blue-900'
-            },
-            {
-              label: 'Editar',
-              action: 'edit',
-              icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              ),
-              className: 'text-green-600 hover:text-green-900'
-            },
-            {
-              label: 'Inactivar',
-              action: 'delete',
-              icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
-                </svg>
-              ),
-              className: 'text-red-600 hover:text-red-900'
-            }
-          ]}
-          emptyState={{
-            icon: (
-              <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            ),
-            title: 'No hay áreas disponibles',
-            description: 'Comience creando una nueva área de trabajo',
-            action: {
-              label: 'Crear Primera Área',
-              onClick: handleNewArea
-            }
-          }}
-        />
+        <div className="space-y-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex-1">
+              <div className="relative">
+                <i className="bx bx-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por nombre, ubicación o tipo"
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-10 py-2.5 text-sm text-gray-700 focus:border-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#E2BE69]/50"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {LOCATION_FILTERS.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setTipoFiltro(filter.key)}
+                  className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
+                    tipoFiltro === filter.key
+                      ? 'border-[#E2BE69] bg-[#FFF8E7] text-[#6F581B]' : 'border-gray-200 bg-white text-gray-600 hover:border-[#E2BE69]/60'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {areasFiltradas.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-gray-200 bg-white/80 px-6 py-12 text-center">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F9F4E7] text-[#B39237]">
+                <i className="bx bx-buildings text-2xl"></i>
+              </div>
+              <p className="text-base font-semibold text-gray-800">No encontramos áreas con los filtros actuales.</p>
+              <p className="mt-1 text-sm text-gray-500">Prueba ajustar la búsqueda o crea una nueva área.</p>
+              <button
+                onClick={handleNewArea}
+                className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#B39237] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[#9C7F2F]"
+              >
+                <i className="bx bx-plus"></i>
+                Crear Área
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {areasFiltradas.map((area) => {
+                const isActive = isAreaActive(area);
+                const cardClasses = `rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
+                  isActive ? 'border-gray-100 bg-white/90' : 'border-red-100 bg-red-50/80'
+                }`;
+                const avatarClasses = `flex h-12 w-12 items-center justify-center rounded-2xl text-base font-bold ${
+                  isActive
+                    ? 'bg-gradient-to-br from-[#F7E8C6] to-[#E2BE69] text-[#6F581B]'
+                    : 'bg-gradient-to-br from-red-200 to-red-100 text-red-700'
+                }`;
+                const nameClasses = `text-base font-semibold ${
+                  isActive ? 'text-gray-900' : 'text-gray-500'
+                }`;
+
+                return (
+                  <div key={area.id_area} className={cardClasses}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={avatarClasses}>
+                          {area.nombre_area?.charAt(0)?.toUpperCase() || 'A'}
+                        </div>
+                        <p className={nameClasses}>{area.nombre_area}</p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-[0.65rem] font-semibold ${
+                        isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                      }`}>
+                        {isActive ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRowAction('edit', area)}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#D4AF37] bg-[#FFF8E7] px-3 py-2 text-xs font-semibold text-[#6F581B] hover:bg-[#F9EDCC]"
+                      >
+                        <i className="bx bx-edit"></i>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRowAction('delete', area)}
+                        className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${
+                          isActive
+                            ? 'border-red-100 text-red-600 hover:bg-red-50'
+                            : 'border-green-100 text-green-600 hover:bg-green-50'
+                        }`}
+                      >
+                        <i className={`bx ${isActive ? 'bx-block' : 'bx-refresh'}`}></i>
+                        {isActive ? 'Inactivar' : 'Reactivar'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </CardPanel>
 
       {/* Modal de Vista */}

@@ -107,7 +107,9 @@ class AuthController {
                         nombre_completo: `${usuario.nombre} ${usuario.apellido}`,
                         cargo: usuario.cargo,
                         area: usuario.nombre_area,
-                        ubicacion: usuario.ubicacion_nombre
+                        ubicacion: usuario.ubicacion_nombre,
+                        avatar_url: usuario.avatar_url || null,
+                        avatar_color: usuario.avatar_color || '#9CA3AF'
                     }
                 }
             });
@@ -152,10 +154,12 @@ class AuthController {
                 success: true,
                 message: 'Token válido',
                 data: {
-                    id_usuario: usuario.id_usuario,
-                    username: usuario.username,
-                    id_rol: usuario.id_rol ? Number(usuario.id_rol) : null,
-                    nombre_rol: usuario.nombre_rol ? usuario.nombre_rol.toString().toLowerCase() : null,
+                    id_usuario: usuarioActual.id_usuario,
+                    username: usuarioActual.username,
+                    id_rol: usuarioActual.id_rol ? Number(usuarioActual.id_rol) : null,
+                    nombre_rol: usuarioActual.nombre_rol ? usuarioActual.nombre_rol.toString().toLowerCase() : null,
+                    avatar_url: usuarioActual.avatar_url || null,
+                    avatar_color: usuarioActual.avatar_color || '#9CA3AF',
                     expires_at: usuario.exp ? new Date(usuario.exp * 1000) : null
                 }
             });
@@ -217,7 +221,9 @@ class AuthController {
                     area: usuario.nombre_area,
                     ubicacion: usuario.ubicacion_nombre,
                     ultimo_acceso: usuario.ultimo_acceso,
-                    telefono: usuario.telefono
+                    telefono: usuario.telefono,
+                    avatar_url: usuario.avatar_url || null,
+                    avatar_color: usuario.avatar_color || '#9CA3AF'
                 }
             });
 

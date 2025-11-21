@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Modal from './Modal';
+import { getToken } from '../../utils/tokenStorage';
 
 const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
   const [formData, setFormData] = useState({
@@ -81,15 +82,14 @@ const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
     
     setLoadingPreview(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
+      const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
       const queryParams = new URLSearchParams({
         fecha_entrega: formData.fecha_entrega
       });
 
       const response = await fetch(`http://localhost:3001/api/ciclos/preview-elegibles?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: authHeaders
       });
 
       if (response.ok) {
@@ -111,7 +111,7 @@ const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                ...authHeaders
               },
               body: JSON.stringify({ anio, valor_mensual: valorNum, observaciones: 'Registrado desde ModalNuevoCiclo' })
             });
@@ -144,7 +144,7 @@ const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
     
     setCreando(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const payload = {
         nombre_ciclo: formData.nombre_ciclo.trim(),
         fecha_entrega: formData.fecha_entrega,
@@ -155,7 +155,7 @@ const ModalNuevoCiclo = ({ isOpen, onClose, onCicloCreado }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(payload)
       });

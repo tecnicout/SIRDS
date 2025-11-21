@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
+import { getToken, setToken, clearToken } from '../utils/tokenStorage';
 
 interface User {
   id: number;
@@ -36,7 +37,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Verificar sesión almacenada
     const checkSession = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getToken();
         if (token) {
           const { user: currentUser } = await authService.checkSession();
           setUser(currentUser);
@@ -44,7 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (err) {
         console.error('Error al verificar sesión:', err);
         setError('Error al verificar sesión');
-        localStorage.removeItem('token');
+        clearToken();
       } finally {
         setLoading(false);
       }
@@ -58,7 +59,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       setError(null);
       const { token, user } = await authService.login(email, password);
-      localStorage.setItem('token', token);
+      setToken(token);
       setUser(user);
     } catch (err) {
       console.error('Error en login:', err);
@@ -72,7 +73,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     try {
       setLoading(true);
-      localStorage.removeItem('token');
+      clearToken();
       setUser(null);
       // Redirigir explícitamente a la vista de login
       if (typeof window !== 'undefined') {

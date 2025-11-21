@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getToken } from '../utils/tokenStorage';
 
 const ContadorProximaEntrega = () => {
   const [proximaEntrega, setProximaEntrega] = useState(null);
@@ -7,10 +8,9 @@ const ContadorProximaEntrega = () => {
   useEffect(() => {
     const fetchProximaEntrega = async () => {
       try {
-  const response = await fetch('http://localhost:3001/api/dotaciones/proximas?limit=1', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+        const token = getToken();
+        const response = await fetch('http://localhost:3001/api/dotaciones/proximas?limit=1', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
         const result = await response.json();
 

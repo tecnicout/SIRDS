@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getToken } from '../../utils/tokenStorage';
 
 const GraficoDotaciones = () => {
   const [stockData, setStockData] = useState([]);
@@ -11,10 +12,9 @@ const GraficoDotaciones = () => {
   useEffect(() => {
     const fetchStock = async () => {
       try {
-  const response = await fetch('http://localhost:3001/api/dotaciones/stock', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+        const token = getToken();
+        const response = await fetch('http://localhost:3001/api/dotaciones/stock', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
         const result = await response.json();
         const stockList = Array.isArray(result) ? result : (result?.data ?? []);

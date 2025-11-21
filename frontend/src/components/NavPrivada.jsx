@@ -1,23 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import useStoredUser from '../hooks/useStoredUser';
+import { clearStoredUser } from '../utils/userStorage';
 
 export default function NavPrivada({ onLogout }) {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        const parsed = JSON.parse(userData);
-        console.log('User data loaded:', parsed); // Debug
-        setUser(parsed);
-      } else {
-        console.log('No user data found in localStorage'); // Debug
-      }
-    } catch (error) {
-      console.error('Error parsing user data:', error);
-      localStorage.removeItem('user'); // Limpiar datos corruptos
-    }
-  }, []);
+  const [user] = useStoredUser();
 
   const getUserName = () => {
     if (user?.nombre_completo) {
@@ -46,14 +32,11 @@ export default function NavPrivada({ onLogout }) {
   };
 
   const handleLogout = () => {
-    console.log('Logout button clicked'); // Debug
     if (onLogout && typeof onLogout === 'function') {
       onLogout();
     } else {
-      console.error('onLogout function not provided or not a function');
-      // Fallback: hacer logout manualmente
       localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      clearStoredUser();
       window.location.href = '/login';
     }
   };

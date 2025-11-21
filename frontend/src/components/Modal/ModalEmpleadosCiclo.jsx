@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Modal from './Modal';
+import { getToken } from '../../utils/tokenStorage';
 
 const ModalEmpleadosCiclo = ({ isOpen, onClose, ciclo, onActualizado }) => {
   const [empleados, setEmpleados] = useState([]);
@@ -20,7 +21,7 @@ const ModalEmpleadosCiclo = ({ isOpen, onClose, ciclo, onActualizado }) => {
     
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const queryParams = new URLSearchParams({
         page: 1,
         limit: 100
@@ -91,7 +92,7 @@ const ModalEmpleadosCiclo = ({ isOpen, onClose, ciclo, onActualizado }) => {
     setSeleccionManual(null);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const params = new URLSearchParams({
         q: terminoBusqueda.trim(),
         limit: 10
@@ -133,7 +134,7 @@ const ModalEmpleadosCiclo = ({ isOpen, onClose, ciclo, onActualizado }) => {
 
     setAgregandoManual(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch(`http://localhost:3001/api/ciclos/${ciclo.id_ciclo}/empleados-manual`, {
         method: 'POST',
         headers: {
@@ -166,7 +167,7 @@ const ModalEmpleadosCiclo = ({ isOpen, onClose, ciclo, onActualizado }) => {
   const eliminarEmpleado = async (empleado) => {
     setActualizandoId(empleado.id_empleado_ciclo);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch(`http://localhost:3001/api/ciclos/empleados/${empleado.id_empleado_ciclo}`, {
         method: 'DELETE',
         headers: {
@@ -199,7 +200,7 @@ const ModalEmpleadosCiclo = ({ isOpen, onClose, ciclo, onActualizado }) => {
   const actualizarEstadoEmpleado = async (idEmpleadoCiclo, nuevoEstado) => {
     setActualizandoId(idEmpleadoCiclo);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const payload = { estado: nuevoEstado };
 
       const response = await fetch(`http://localhost:3001/api/ciclos/empleados/${idEmpleadoCiclo}`, {

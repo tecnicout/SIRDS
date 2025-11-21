@@ -12,6 +12,7 @@ import ContadorProximaEntrega from '../components/ContadorProximaEntrega';
 import { CICLOS_COLUMNS, CICLOS_CUSTOM_ACTIONS, ESTADOS_CICLO, getAnioOptions } from '../components/DataTable/CiclosColumnConfig.jsx';
 import ResourceHeader from '../components/UI/ResourceHeader';
 import CardPanel from '../components/UI/CardPanel';
+import { getToken } from '../utils/tokenStorage';
 
 const Dotaciones = () => {
   const [activeTab, setActiveTab] = useState('entregas');
@@ -55,7 +56,7 @@ const Dotaciones = () => {
       try {
   const response = await fetch('http://localhost:3001/api/dotaciones/kpis', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${getToken()}`
           }
         });
         const result = await response.json();
@@ -73,7 +74,7 @@ const Dotaciones = () => {
   useEffect(() => {
     const cargarDatosCiclos = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getToken();
         
         // Ciclo activo
         const respActivo = await fetch('http://localhost:3001/api/ciclos/activo', {
@@ -110,7 +111,7 @@ const Dotaciones = () => {
   const cargarCiclos = async () => {
     setLoadingCiclos(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const queryParams = new URLSearchParams({
         page: paginacionCiclos.page,
         limit: paginacionCiclos.pageSize,
@@ -197,7 +198,7 @@ const Dotaciones = () => {
 
   const cerrarCiclo = async (idCiclo) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       // Endpoint correcto según rutas: PUT /api/ciclos/:id/estado
       const response = await fetch(`http://localhost:3001/api/ciclos/${idCiclo}/estado`, {
         method: 'PUT',
@@ -224,7 +225,7 @@ const Dotaciones = () => {
 
   const eliminarCiclo = async (idCiclo, force = false) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const url = `http://localhost:3001/api/ciclos/${idCiclo}${force ? '?force=true' : ''}`;
       const resp = await fetch(url, {
         method: 'DELETE',
@@ -271,7 +272,7 @@ const Dotaciones = () => {
               <button
                 onClick={() => setShowModalEntrega(true)}
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-[#D4AF37] to-[#B39237] hover:from-[#B39237] hover:to-[#9C7F2F] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[#E2BE69] focus:ring-offset-2"
-              >
+              > 
                 <i className="bx bx-plus"></i>
                 Registrar Entrega
               </button>
@@ -559,7 +560,7 @@ const Dotaciones = () => {
                 onClick={async ()=>{
                   try {
                     setEditSubmitting(true);
-                    const token = localStorage.getItem('token');
+                    const token = getToken();
                     const resp = await fetch(`http://localhost:3001/api/ciclos/${cicloEnEdicion.id_ciclo}/estado`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
